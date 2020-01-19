@@ -6,6 +6,8 @@
 
 Datasette plugin for uploading CSV files and converting them to a database table
 
+**EARLY ALPHA**: Do not use this software!
+
 ## Installation
 
     pip install datasette-upload-csvs
