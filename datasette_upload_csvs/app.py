@@ -1,7 +1,6 @@
 from starlette.responses import PlainTextResponse, HTMLResponse
 from starlette.endpoints import HTTPEndpoint
 import csv as csv_std
-from html import escape
 import codecs
 import sqlite_utils
 
@@ -17,17 +16,9 @@ class UploadApp(HTTPEndpoint):
         return mutable[0]
 
     async def get(self, request):
-        return HTMLResponse(
-            """
-        <h1>Upload a CSV</h1>
-        <p>CSV will be imported into <strong>{}</strong></p>
-        <form action="/-/upload-csv" method="post" enctype="multipart/form-data">
-            <input type="file" name="csv"> <input type="submit" value="Upload">
-        </form>
-        """.format(
-                escape(self.get_database().name)
-            )
-        )
+        return HTMLResponse(await self.datasette.render_template("upload_csv.html", {
+            "database_name": self.get_database().name
+        }))
 
     async def post(self, request):
         formdata = await request.form()
@@ -56,4 +47,10 @@ class UploadApp(HTTPEndpoint):
 
         await db.execute_against_connection_in_thread(fn)
 
-        return PlainTextResponse(f"Uploaded! ")
+        return HTMLResponse(await self.datasette.render_template("upload_csv_done.html", {
+            "database": self.get_database().name,
+            "table": filename,
+            "num_docs": list(await db.execute("select count(*) from [{}]".format(
+                filename
+            )))[0][0]
+        }))

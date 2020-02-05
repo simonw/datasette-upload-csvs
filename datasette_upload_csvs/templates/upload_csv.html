@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}Upload a CSV to {{ database_name }}{% endblock %}
+
+{% block content %}
+<h1>Upload a CSV</h1>
+<p>CSV will be imported into <strong>{{ database_name }}</strong></p>
+<form action="/-/upload-csv" method="post" enctype="multipart/form-data">
+    <input type="file" name="csv"> <input type="submit" value="Upload">
+</form>
+{% endblock %}

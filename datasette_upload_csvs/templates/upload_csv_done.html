@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}Upload complete to {{ database_name }}{% endblock %}
+
+{% block content %}
+<h1>Upload complete</h1>
+
+<p>Imported {{ num_docs }} rows into
+    <a href="/{{ database|quote_plus }}/{{ table|quote_plus }}">{{ table }}</a>
+</p>
+{% endblock %}

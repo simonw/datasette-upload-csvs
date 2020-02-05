@@ -24,11 +24,12 @@ setup(
     packages=["datasette_upload_csvs"],
     entry_points={"datasette": ["upload_csvs = datasette_upload_csvs"]},
     install_requires=[
-        "datasette",
+        "datasette~=0.35",
         "starlette",
         "aiofiles",
         "python-multipart",
         "sqlite-utils",
     ],
     extras_require={"test": ["pytest", "pytest-asyncio", "asgiref==3.1.2", "requests"]},
+    package_data={"datasette_upload_csvs": ["templates/*.html"]},
 )
