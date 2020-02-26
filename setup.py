@@ -30,6 +30,6 @@ setup(
         "python-multipart",
         "sqlite-utils",
     ],
-    extras_require={"test": ["pytest", "pytest-asyncio", "asgiref==3.1.2", "requests"]},
+    extras_require={"test": ["pytest", "pytest-asyncio", "asgiref==3.1.2", "httpx"]},
     package_data={"datasette_upload_csvs": ["templates/*.html"]},
 )
