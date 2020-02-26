@@ -1,7 +1,7 @@
 from setuptools import setup
 import os
 
-VERSION = "0.2a"
+VERSION = "0.3"
 
 
 def get_long_description():
@@ -24,7 +24,7 @@ setup(
     packages=["datasette_upload_csvs"],
     entry_points={"datasette": ["upload_csvs = datasette_upload_csvs"]},
     install_requires=[
-        "datasette~=0.35",
+        "datasette~=0.37",
         "starlette",
         "aiofiles",
         "python-multipart",

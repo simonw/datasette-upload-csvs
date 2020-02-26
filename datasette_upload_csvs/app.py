@@ -16,9 +16,11 @@ class UploadApp(HTTPEndpoint):
         return mutable[0]
 
     async def get(self, request):
-        return HTMLResponse(await self.datasette.render_template("upload_csv.html", {
-            "database_name": self.get_database().name
-        }))
+        return HTMLResponse(
+            await self.datasette.render_template(
+                "upload_csv.html", {"database_name": self.get_database().name}
+            )
+        )
 
     async def post(self, request):
         formdata = await request.form()
@@ -33,24 +35,24 @@ class UploadApp(HTTPEndpoint):
         docs = (dict(zip(headers, row)) for row in reader)
         if filename.endswith(".csv"):
             filename = filename[:-4]
+
         # Import data into a table of that name using sqlite-utils
         db = self.get_database()
-        # This didn't work because the DB connection was read-only:
-        # def fn(conn):
-        #     sqlite_utils.Database(conn)[filename].insert_all(docs, alter=True)
-        # await db.execute_against_connection_in_thread(fn)
 
-        # For the moment, total abuse of execute_against_connection_in_thread:
         def fn(conn):
-            writable_conn = sqlite_utils.Database(db.path)
-            writable_conn[filename].insert_all(docs, alter=True)
+            database = sqlite_utils.Database(conn)
+            database[filename].insert_all(docs, alter=True)
+            return database[filename].count
 
-        await db.execute_against_connection_in_thread(fn)
+        num_docs = await db.execute_write_fn(fn, block=True)
 
-        return HTMLResponse(await self.datasette.render_template("upload_csv_done.html", {
-            "database": self.get_database().name,
-            "table": filename,
-            "num_docs": list(await db.execute("select count(*) from [{}]".format(
-                filename
-            )))[0][0]
-        }))
+        return HTMLResponse(
+            await self.datasette.render_template(
+                "upload_csv_done.html",
+                {
+                    "database": self.get_database().name,
+                    "table": filename,
+                    "num_docs": num_docs,
+                },
+            )
+        )

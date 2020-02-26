@@ -6,8 +6,8 @@
 
 Datasette plugin for uploading CSV files and converting them to a database table
 
-**EARLY ALPHA**: Do not use this software!
-
 ## Installation
 
     pip install datasette-upload-csvs
+
+This plugin does not implement authentication, so if you are going to run this on a public site you should use something like [datasettte-auth-github](https://github.com/simonw/datasette-auth-github) to ensure only authenticated users can interact with Datasette and upload data to it.

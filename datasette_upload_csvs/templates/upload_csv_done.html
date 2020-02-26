@@ -5,7 +5,7 @@
 {% block content %}
 <h1>Upload complete</h1>
 
-<p>Imported {{ num_docs }} rows into
+<p>Imported {{ "{:,}".format(num_docs) }} rows into
     <a href="/{{ database|quote_plus }}/{{ table|quote_plus }}">{{ table }}</a>
 </p>
 {% endblock %}
