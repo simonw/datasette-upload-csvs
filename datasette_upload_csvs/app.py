@@ -1,5 +1,6 @@
-from starlette.responses import PlainTextResponse, HTMLResponse
+from starlette.responses import PlainTextResponse, HTMLResponse, JSONResponse
 from starlette.endpoints import HTTPEndpoint
+from urllib.parse import quote_plus
 import csv as csv_std
 import codecs
 import sqlite_utils
@@ -45,6 +46,16 @@ class UploadApp(HTTPEndpoint):
             return database[filename].count
 
         num_docs = await db.execute_write_fn(fn, block=True)
+
+        if formdata.get("xhr"):
+            return JSONResponse(
+                {
+                    "url": "/{database}/{table}".format(
+                        database=quote_plus(self.get_database().name),
+                        table=quote_plus(filename),
+                    )
+                }
+            )
 
         return HTMLResponse(
             await self.datasette.render_template(
