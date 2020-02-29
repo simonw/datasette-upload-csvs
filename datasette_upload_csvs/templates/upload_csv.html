@@ -2,10 +2,130 @@
 
 {% block title %}Upload a CSV to {{ database_name }}{% endblock %}
 
+{% block extra_head %}
+<style type="text/css">
+#file-drop {
+    border: 2px dashed #aaa;
+    border-radius: 1em;
+    width: 80%;
+    font-family: sans-serif;
+    padding: 1em;
+    box-sizing: border-box;
+}
+#file-drop.highlight {
+    border-color: purple;
+    background-color: #8000801f;
+}
+#file-drop label {
+    margin: 0;
+    padding: 1em;
+    font-style: italic;
+    text-align: center;
+    display: block;
+    width: 100%;
+}
+input[type=file] {
+    display: none;
+}
+progress {
+    -webkit-appearance: none;
+    appearance: none;
+    border: none;
+    width: 80%;
+    height: 2em;
+    margin-top: 1em;
+}
+progress::-webkit-progress-bar {
+    background-color: #ddd;
+}
+progress::-webkit-progress-value {
+    background-color: #124d77;
+}
+</style>
+{% endblock %}
+
 {% block content %}
 <h1>Upload a CSV</h1>
 <p>CSV will be imported into <strong>{{ database_name }}</strong></p>
 <form action="/-/upload-csv" method="post" enctype="multipart/form-data">
-    <input type="file" name="csv"> <input type="submit" value="Upload">
+<div id="file-drop">
+    <input type="file" name="csv" id="csvUpload">
+    <label for="csvUpload">Select a file to upload or drag and drop one here</label>
+</div>
+<progress class="progress" value="0" max="100">Uploading...</progress>
 </form>
+</div>
+
+<script>
+var fileInput = document.getElementsByName("csv")[0];
+var dropArea = document.getElementById("file-drop");
+var progress = document.getElementsByTagName("progress")[0];
+var label = dropArea.getElementsByTagName("label")[0];
+progress.style.display = "none";
+fileInput.addEventListener("change", () => {
+  uploadFile(fileInput.files[0]);
+});
+["dragenter", "dragover", "dragleave", "drop"].forEach(eventName => {
+  dropArea.addEventListener(
+    eventName,
+    e => {
+      e.preventDefault();
+      e.stopPropagation();
+    },
+    false
+  );
+});
+["dragenter", "dragover"].forEach(eventName => {
+  dropArea.addEventListener(
+    eventName,
+    () => {
+      dropArea.classList.add("highlight");
+    },
+    false
+  );
+});
+
+["dragleave", "drop"].forEach(eventName => {
+  dropArea.addEventListener(
+    eventName,
+    () => {
+      dropArea.classList.remove("highlight");
+    },
+    false
+  );
+});
+
+dropArea.addEventListener(
+  "drop",
+  e => {
+    uploadFile(e.dataTransfer.files[0]);
+  },
+  false
+);
+
+function uploadFile(file) {
+  label.innerText = file.name;
+  var xhr = new XMLHttpRequest();
+  var formData = new FormData();
+  xhr.open("POST", fileInput.form.action, true);
+
+  // Add following event listener
+  xhr.upload.addEventListener("progress", function(e) {
+    progress.value = (e.loaded * 100.0) / e.total || 100;
+  });
+  progress.style.display = "block";
+
+  xhr.addEventListener("readystatechange", function(e) {
+    if (xhr.readyState == 4 && xhr.status == 200) {
+      document.location = JSON.parse(xhr.responseText).url;
+    } else if (xhr.readyState == 4 && xhr.status != 200) {
+      alert("Error!");
+    }
+  });
+
+  formData.append("csv", file);
+  formData.append("xhr", "1");
+  xhr.send(formData);
+}
+</script>
 {% endblock %}
