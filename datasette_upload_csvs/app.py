@@ -3,6 +3,7 @@ from starlette.endpoints import HTTPEndpoint
 from urllib.parse import quote_plus
 import csv as csv_std
 import codecs
+import datetime
 import io
 import os
 import sqlite_utils
@@ -39,8 +40,7 @@ class UploadApp(HTTPEndpoint):
 
         total_size = get_temporary_file_size(csv.file)
 
-        def fn(conn):
-
+        def insert_docs(conn):
             # TODO: Support other encodings:
             reader = csv_std.reader(codecs.iterdecode(csv.file, "utf-8"))
             headers = next(reader)
@@ -53,29 +53,42 @@ class UploadApp(HTTPEndpoint):
                 {
                     "id": task_id,
                     "filename": filename,
-                    "todo": total_size,
-                    "done": 0,
-                    "rows": 0,
+                    "bytes_todo": total_size,
+                    "bytes_done": 0,
+                    "rows_done": 0,
+                    "started": str(datetime.datetime.utcnow()),
+                    "completed": None,
                 },
                 pk="id",
+                alter=True,
             )
 
+            i = 0
+
             def docs_with_progress():
-                i = 0
+                nonlocal i
                 for doc in docs:
                     i += 1
                     yield doc
                     if i % 10 == 0:
                         database["_csv_progress_"].update(
-                            task_id, {"rows": i, "done": csv.file.tell(),}
+                            task_id, {"rows_done": i, "bytes_done": csv.file.tell(),}
                         )
 
             database[filename].insert_all(
                 docs_with_progress(), alter=True, batch_size=100
             )
+            database["_csv_progress_"].update(
+                task_id,
+                {
+                    "rows_done": i,
+                    "bytes_done": total_size,
+                    "completed": str(datetime.datetime.utcnow()),
+                },
+            )
             return database[filename].count
 
-        await db.execute_write_fn(fn)
+        await db.execute_write_fn(insert_docs)
 
         if formdata.get("xhr"):
             return JSONResponse(
@@ -90,10 +103,7 @@ class UploadApp(HTTPEndpoint):
         return HTMLResponse(
             await self.datasette.render_template(
                 "upload_csv_done.html",
-                {
-                    "database": self.get_database().name,
-                    "table": filename,
-                },
+                {"database": self.get_database().name, "table": filename,},
             )
         )
 

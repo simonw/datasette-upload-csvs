@@ -117,7 +117,8 @@ function uploadFile(file) {
 
   xhr.addEventListener("readystatechange", function(e) {
     if (xhr.readyState == 4 && xhr.status == 200) {
-      document.location = JSON.parse(xhr.responseText).url;
+      // document.location = JSON.parse(xhr.responseText).url;
+      alert(JSON.stringify(JSON.parse(xhr.responseText)));
     } else if (xhr.readyState == 4 && xhr.status != 200) {
       alert("Error!");
     }
