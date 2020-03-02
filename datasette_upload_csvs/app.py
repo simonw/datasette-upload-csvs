@@ -106,6 +106,16 @@ class UploadApp(HTTPEndpoint):
                 }
             )
 
+        if formdata.get("xhr"):
+            return JSONResponse(
+                {
+                    "url": "/{database}/{table}".format(
+                        database=quote_plus(self.get_database().name),
+                        table=quote_plus(filename),
+                    )
+                }
+            )
+
         return HTMLResponse(
             await self.datasette.render_template(
                 "upload_csv_done.html",
