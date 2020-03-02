@@ -39,16 +39,10 @@ class UploadApp(HTTPEndpoint):
         db = self.get_database()
 
         total_size = get_temporary_file_size(csv.file)
+        task_id = str(uuid.uuid4())
 
-        def insert_docs(conn):
-            # TODO: Support other encodings:
-            reader = csv_std.reader(codecs.iterdecode(csv.file, "utf-8"))
-            headers = next(reader)
-
-            docs = (dict(zip(headers, row)) for row in reader)
-
+        def insert_initial_record(conn):
             database = sqlite_utils.Database(conn)
-            task_id = str(uuid.uuid4())
             database["_csv_progress_"].insert(
                 {
                     "id": task_id,
@@ -62,6 +56,16 @@ class UploadApp(HTTPEndpoint):
                 pk="id",
                 alter=True,
             )
+
+        await db.execute_write_fn(insert_initial_record, block=True)
+
+        def insert_docs(conn):
+            database = sqlite_utils.Database(conn)
+            # TODO: Support other encodings:
+            reader = csv_std.reader(codecs.iterdecode(csv.file, "utf-8"))
+            headers = next(reader)
+
+            docs = (dict(zip(headers, row)) for row in reader)
 
             i = 0
 
@@ -96,7 +100,9 @@ class UploadApp(HTTPEndpoint):
                     "url": "/{database}/{table}".format(
                         database=quote_plus(self.get_database().name),
                         table=quote_plus(filename),
-                    )
+                    ),
+                    "task_id": task_id,
+                    "bytes_todo": total_size,
                 }
             )
 
