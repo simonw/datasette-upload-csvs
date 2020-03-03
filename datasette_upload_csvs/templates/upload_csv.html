@@ -121,14 +121,12 @@ function uploadFile(file) {
 
   xhr.addEventListener("readystatechange", function(e) {
     if (xhr.readyState == 4 && xhr.status == 200) {
-      // document.location = JSON.parse(xhr.responseText).url;
       var data = JSON.parse(xhr.responseText);
       // Show server-side processing progress bar
       console.log(data);
       progressLabel.innerHTML = "Processing...";
       progress.value = 0;
-      // TODO: send /data/ bit from server 
-      var url = `/data/_csv_progress_.json?id=${data.task_id}&_shape=array`;
+      var url = `/${data.database_path}/_csv_progress_.json?id=${data.task_id}&_shape=array`;
       function pollForProgress() {
           fetch(url).then(d => d.json()).then(rows => {
               progress.value = (rows[0].bytes_done * 100.0) / rows[0].bytes_todo;

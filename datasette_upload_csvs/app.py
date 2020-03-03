@@ -98,9 +98,9 @@ class UploadApp(HTTPEndpoint):
             return JSONResponse(
                 {
                     "url": "/{database}/{table}".format(
-                        database=quote_plus(self.get_database().name),
-                        table=quote_plus(filename),
+                        database=quote_plus(db.name), table=quote_plus(filename),
                     ),
+                    "database_path": quote_plus(db.name),
                     "task_id": task_id,
                     "bytes_todo": total_size,
                 }
@@ -118,8 +118,7 @@ class UploadApp(HTTPEndpoint):
 
         return HTMLResponse(
             await self.datasette.render_template(
-                "upload_csv_done.html",
-                {"database": self.get_database().name, "table": filename,},
+                "upload_csv_done.html", {"database": db.name, "table": filename,},
             )
         )
 
