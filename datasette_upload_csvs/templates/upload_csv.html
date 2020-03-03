@@ -52,6 +52,7 @@ progress::-webkit-progress-value {
     <input type="file" name="csv" id="csvUpload">
     <label for="csvUpload">Select a file to upload or drag and drop one here</label>
 </div>
+<p style="margin-bottom: -0.8em;font-size: 0.8em; display: none;" id="progress-label">Uploading...</p>
 <progress class="progress" value="0" max="100">Uploading...</progress>
 </form>
 </div>
@@ -60,6 +61,7 @@ progress::-webkit-progress-value {
 var fileInput = document.getElementsByName("csv")[0];
 var dropArea = document.getElementById("file-drop");
 var progress = document.getElementsByTagName("progress")[0];
+var progressLabel = document.getElementById("progress-label");
 var label = dropArea.getElementsByTagName("label")[0];
 progress.style.display = "none";
 fileInput.addEventListener("change", () => {
@@ -107,6 +109,8 @@ function uploadFile(file) {
   label.innerText = file.name;
   var xhr = new XMLHttpRequest();
   var formData = new FormData();
+  dropArea.style.display = "none";
+  progressLabel.style.display = "block";
   xhr.open("POST", fileInput.form.action, true);
 
   // Add following event listener
@@ -117,7 +121,24 @@ function uploadFile(file) {
 
   xhr.addEventListener("readystatechange", function(e) {
     if (xhr.readyState == 4 && xhr.status == 200) {
-      document.location = JSON.parse(xhr.responseText).url;
+      var data = JSON.parse(xhr.responseText);
+      // Show server-side processing progress bar
+      console.log(data);
+      progressLabel.innerHTML = "Processing...";
+      progress.value = 0;
+      var url = `/${data.database_path}/_csv_progress_.json?id=${data.task_id}&_shape=array`;
+      function pollForProgress() {
+          fetch(url).then(d => d.json()).then(rows => {
+              progress.value = (rows[0].bytes_done * 100.0) / rows[0].bytes_todo;
+              progressLabel.innerHTML = `Processing... ${Number(rows[0].rows_done).toLocaleString()} rows imported`;
+              if (rows[0].bytes_done == rows[0].bytes_todo) {
+                  document.location = JSON.parse(xhr.responseText).url;
+              } else {
+                  setTimeout(pollForProgress, 1000);
+              }
+          });
+      }
+      pollForProgress();
     } else if (xhr.readyState == 4 && xhr.status != 200) {
       alert("Error!");
     }
