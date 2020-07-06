@@ -1,9 +1,20 @@
 from datasette.app import Datasette
 import asyncio
+from asgi_lifespan import LifespanManager
 import json
 import pytest
 import httpx
 import sqlite_utils
+
+
+@pytest.mark.asyncio
+async def test_lifespan():
+    ds = Datasette([], memory=True)
+    app = ds.app()
+    async with LifespanManager(app):
+        async with httpx.AsyncClient(app=app) as client:
+            response = await client.get("http://localhost/")
+            assert 200 == response.status_code
 
 
 @pytest.mark.asyncio
@@ -16,12 +27,7 @@ async def test_upload(tmpdir):
     datasette = Datasette([path])
 
     # First test the upload page exists
-
-    dispatch = httpx.ASGIDispatch(
-        app=datasette.app(), client=("1.2.3.4", 123), raise_app_exceptions=True
-    )
-
-    async with httpx.AsyncClient(dispatch=dispatch) as client:
+    async with httpx.AsyncClient(app=datasette.app()) as client:
         response = await client.get("http://localhost/-/upload-csv")
         assert 200 == response.status_code
         assert b'<form action="/-/upload-csv" method="post"' in response.content
