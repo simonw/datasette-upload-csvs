@@ -31,10 +31,13 @@ async def test_upload(tmpdir):
         response = await client.get("http://localhost/-/upload-csv")
         assert 200 == response.status_code
         assert b'<form action="/-/upload-csv" method="post"' in response.content
+        csrftoken = response.cookies["ds_csrftoken"]
 
         # Now try uploading a file
         files = {"csv": ("dogs.csv", "name,age\nCleo,5\nPancakes,4", "text/csv")}
-        response = await client.post("http://localhost/-/upload-csv", files=files)
+        response = await client.post(
+            "http://localhost/-/upload-csv", data={"csrftoken": csrftoken}, files=files
+        )
         assert b"<h1>Upload in progress</h1>" in response.content
 
         # Now things get tricky... the upload is running in a thread, so poll for completion
