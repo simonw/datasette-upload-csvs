@@ -144,8 +144,9 @@ function uploadFile(file) {
     }
   });
 
-  formData.append("csv", file);
   formData.append("xhr", "1");
+  formData.append("csv", file);
+  formData.append("csrftoken", "{{ csrftoken() }}";
   xhr.send(formData);
 }
 </script>
