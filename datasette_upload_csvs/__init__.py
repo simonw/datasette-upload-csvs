@@ -14,11 +14,12 @@ import uuid
 @hookimpl
 def register_routes():
     return [
-        (r"^/-/upload-csv$", upload_csv),
+        (r"^/-/upload-csvs$", upload_csvs),
+        (r"^/-/upload-csv$", lambda: Response.redirect("/-/upload-csvs")),
     ]
 
 
-async def upload_csv(scope, receive, datasette, request):
+async def upload_csvs(scope, receive, datasette, request):
     # For the moment just use the first database that's not immutable
     db = [db for db in datasette.databases.values() if db.is_mutable][0]
 

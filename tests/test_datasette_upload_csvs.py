@@ -18,6 +18,18 @@ async def test_lifespan():
 
 
 @pytest.mark.asyncio
+async def test_redirect():
+    datasette = Datasette([], memory=True)
+    # First test the upload page exists
+    async with httpx.AsyncClient(app=datasette.app()) as client:
+        response = await client.get(
+            "http://localhost/-/upload-csv", allow_redirects=False
+        )
+        assert response.status_code == 302
+        assert response.headers["location"] == "/-/upload-csvs"
+
+
+@pytest.mark.asyncio
 async def test_upload(tmpdir):
     path = str(tmpdir / "data.db")
     db = sqlite_utils.Database(path)
