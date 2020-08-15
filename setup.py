@@ -32,7 +32,7 @@ setup(
         "sqlite-utils",
     ],
     extras_require={
-        "test": ["pytest", "pytest-asyncio", "asgiref==3.1.2", "httpx", "asgi-lifespan"]
+        "test": ["pytest", "pytest-asyncio", "asgiref", "httpx", "asgi-lifespan"]
     },
     package_data={"datasette_upload_csvs": ["templates/*.html"]},
 )
