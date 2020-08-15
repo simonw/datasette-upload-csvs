@@ -47,7 +47,7 @@ progress::-webkit-progress-value {
 {% block content %}
 <h1>Upload a CSV</h1>
 <p>CSV will be imported into <strong>{{ database_name }}</strong></p>
-<form action="/-/upload-csv" method="post" enctype="multipart/form-data">
+<form action="/-/upload-csvs" method="post" enctype="multipart/form-data">
 <div id="file-drop">
     <input type="file" name="csv" id="csvUpload">
     <label for="csvUpload">Select a file to upload or drag and drop one here</label>

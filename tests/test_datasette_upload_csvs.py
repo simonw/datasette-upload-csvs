@@ -20,7 +20,6 @@ async def test_lifespan():
 @pytest.mark.asyncio
 async def test_redirect():
     datasette = Datasette([], memory=True)
-    # First test the upload page exists
     async with httpx.AsyncClient(app=datasette.app()) as client:
         response = await client.get(
             "http://localhost/-/upload-csv", allow_redirects=False
@@ -38,17 +37,23 @@ async def test_upload(tmpdir):
 
     datasette = Datasette([path])
 
+    cookies = {"ds_actor": datasette.sign({"a": {"id": "root"}}, "actor")}
+
     # First test the upload page exists
     async with httpx.AsyncClient(app=datasette.app()) as client:
-        response = await client.get("http://localhost/-/upload-csv")
+        response = await client.get("http://localhost/-/upload-csvs", cookies=cookies)
         assert 200 == response.status_code
-        assert b'<form action="/-/upload-csv" method="post"' in response.content
+        assert b'<form action="/-/upload-csvs" method="post"' in response.content
         csrftoken = response.cookies["ds_csrftoken"]
+        cookies["ds_csrftoken"] = csrftoken
 
         # Now try uploading a file
         files = {"csv": ("dogs.csv", "name,age\nCleo,5\nPancakes,4", "text/csv")}
         response = await client.post(
-            "http://localhost/-/upload-csv", data={"csrftoken": csrftoken}, files=files
+            "http://localhost/-/upload-csvs",
+            cookies=cookies,
+            data={"csrftoken": csrftoken},
+            files=files,
         )
         assert b"<h1>Upload in progress</h1>" in response.content
 
@@ -68,3 +73,22 @@ async def test_upload(tmpdir):
 
     dogs = list(db["dogs"].rows)
     assert [{"name": "Cleo", "age": "5"}, {"name": "Pancakes", "age": "4"}] == dogs
+
+
+@pytest.mark.asyncio
+async def test_permissions(tmpdir):
+    path = str(tmpdir / "data.db")
+    db = sqlite_utils.Database(path)["foo"].insert({"hello": "world"})
+    ds = Datasette([path])
+    app = ds.app()
+    async with httpx.AsyncClient(app=app) as client:
+        response = await client.get("http://localhost/-/upload-csvs")
+        assert 403 == response.status_code
+    # Now try with a root actor
+    async with httpx.AsyncClient(app=app) as client2:
+        response2 = await client2.get(
+            "http://localhost/-/upload-csvs",
+            cookies={"ds_actor": ds.sign({"a": {"id": "root"}}, "actor")},
+            allow_redirects=False,
+        )
+        assert 403 != response2.status_code

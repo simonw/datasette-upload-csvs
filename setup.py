@@ -14,7 +14,7 @@ def get_long_description():
 
 setup(
     name="datasette-upload-csvs",
-    description="Datasette plugin for uploading CSV files and converting them to a database table",
+    description="Datasette plugin for uploading CSV files and converting them to database tables",
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
     author="Simon Willison",

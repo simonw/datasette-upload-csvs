@@ -4,10 +4,16 @@
 [![CircleCI](https://circleci.com/gh/simonw/datasette-upload-csvs.svg?style=svg)](https://circleci.com/gh/simonw/datasette-upload-csvs)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/simonw/datasette-upload-csvs/blob/main/LICENSE)
 
-Datasette plugin for uploading CSV files and converting them to a database table
+Datasette plugin for uploading CSV files and converting them to database tables
 
 ## Installation
 
-    pip install datasette-upload-csvs
+    datasette install datasette-upload-csvs
 
-This plugin does not implement authentication, so if you are going to run this on a public site you should use something like [datasettte-auth-github](https://github.com/simonw/datasette-auth-github) to ensure only authenticated users can interact with Datasette and upload data to it.
+## Usage
+
+The plugin adds an interface at `/-/upload-csvs` for uploading a CSV file and using it to create a new database table.
+
+By default only [the root actor](https://datasette.readthedocs.io/en/stable/authentication.html#using-the-root-actor) can access the page - so you'll need to run Datasette with the `--root` option and click on the link shown in the terminal to sign in and access the page.
+
+The `upload-csvs` permission governs access. You can use permission plugins such as [datasette-permissions-sql](https://github.com/simonw/datasette-permissions-sql) to grant additional access to the write interface.

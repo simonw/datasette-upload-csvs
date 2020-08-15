@@ -1,5 +1,5 @@
 from datasette import hookimpl
-from datasette.utils.asgi import Response
+from datasette.utils.asgi import Response, Forbidden
 from starlette.requests import Request
 from urllib.parse import quote_plus
 import csv as csv_std
@@ -12,6 +12,12 @@ import uuid
 
 
 @hookimpl
+def permission_allowed(actor, action):
+    if action == "upload-csvs" and actor and actor.get("id") == "root":
+        return True
+
+
+@hookimpl
 def register_routes():
     return [
         (r"^/-/upload-csvs$", upload_csvs),
@@ -20,6 +26,11 @@ def register_routes():
 
 
 async def upload_csvs(scope, receive, datasette, request):
+    if not await datasette.permission_allowed(
+        request.actor, "upload-csvs", default=False
+    ):
+        raise Forbidden("Permission denied for upload-csvs")
+
     # For the moment just use the first database that's not immutable
     db = [db for db in datasette.databases.values() if db.is_mutable][0]
 
