@@ -123,7 +123,6 @@ function uploadFile(file) {
     if (xhr.readyState == 4 && xhr.status == 200) {
       var data = JSON.parse(xhr.responseText);
       // Show server-side processing progress bar
-      console.log(data);
       progressLabel.innerHTML = "Processing...";
       progress.value = 0;
       var url = `/${data.database_path}/_csv_progress_.json?id=${data.task_id}&_shape=array`;
@@ -144,8 +143,9 @@ function uploadFile(file) {
     }
   });
 
-  formData.append("csv", file);
   formData.append("xhr", "1");
+  formData.append("csrftoken", "{{ csrftoken() }}");
+  formData.append("csv", file);
   xhr.send(formData);
 }
 </script>
