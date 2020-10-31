@@ -28,6 +28,25 @@ async def test_redirect():
         assert response.headers["location"] == "/-/upload-csvs"
 
 
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("auth", [True, False])
+async def test_menu(auth):
+    ds = Datasette([], memory=True)
+    app = ds.app()
+    async with LifespanManager(app):
+        async with httpx.AsyncClient(app=app) as client:
+            cookies = {}
+            if auth:
+                cookies = {"ds_actor": ds.sign({"a": {"id": "root"}}, "actor")}
+            response = await client.get("http://localhost/", cookies=cookies)
+            assert 200 == response.status_code
+            if auth:
+                assert "/-/upload-csvs" in response.text
+            else:
+                assert "/-/upload-csvs" not in response.text
+
+
 @pytest.mark.asyncio
 async def test_upload(tmpdir):
     path = str(tmpdir / "data.db")

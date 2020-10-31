@@ -25,6 +25,17 @@ def register_routes():
     ]
 
 
+@hookimpl
+def menu_links(datasette, actor):
+    async def inner():
+        if await datasette.permission_allowed(actor, "upload-csvs", default=False):
+            return [
+                {"href": datasette.urls.path("/-/upload-csvs"), "label": "Upload CSVs"},
+            ]
+
+    return inner
+
+
 async def upload_csvs(scope, receive, datasette, request):
     if not await datasette.permission_allowed(
         request.actor, "upload-csvs", default=False
@@ -91,7 +102,11 @@ async def upload_csvs(scope, receive, datasette, request):
                 yield doc
                 if i % 10 == 0:
                     database["_csv_progress_"].update(
-                        task_id, {"rows_done": i, "bytes_done": csv.file.tell(),}
+                        task_id,
+                        {
+                            "rows_done": i,
+                            "bytes_done": csv.file.tell(),
+                        },
                     )
 
         database[filename].insert_all(docs_with_progress(), alter=True, batch_size=100)
@@ -111,7 +126,8 @@ async def upload_csvs(scope, receive, datasette, request):
         return Response.json(
             {
                 "url": "/{database}/{table}".format(
-                    database=quote_plus(db.name), table=quote_plus(filename),
+                    database=quote_plus(db.name),
+                    table=quote_plus(filename),
                 ),
                 "database_path": quote_plus(db.name),
                 "task_id": task_id,
@@ -121,7 +137,8 @@ async def upload_csvs(scope, receive, datasette, request):
 
     return Response.html(
         await datasette.render_template(
-            "upload_csv_done.html", {"database": db.name, "table": filename},
+            "upload_csv_done.html",
+            {"database": db.name, "table": filename},
         )
     )
 

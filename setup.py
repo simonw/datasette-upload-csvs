@@ -24,7 +24,7 @@ setup(
     packages=["datasette_upload_csvs"],
     entry_points={"datasette": ["upload_csvs = datasette_upload_csvs"]},
     install_requires=[
-        "datasette>=0.47",
+        "datasette>=0.51",
         "asgi-csrf>=0.7",
         "starlette",
         "aiofiles",
