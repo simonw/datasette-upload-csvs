@@ -43,7 +43,11 @@ async def upload_csvs(scope, receive, datasette, request):
         raise Forbidden("Permission denied for upload-csvs")
 
     # For the moment just use the first database that's not immutable
-    db = [db for db in datasette.databases.values() if db.is_mutable][0]
+    db = [
+        db
+        for db in datasette.databases.values()
+        if db.is_mutable and db.name != "_internal"
+    ][0]
 
     # We need the ds_request to pass to render_template for CSRF tokens
     ds_request = request

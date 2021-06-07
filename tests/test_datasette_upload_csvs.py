@@ -28,7 +28,6 @@ async def test_redirect():
         assert response.headers["location"] == "/-/upload-csvs"
 
 
-
 @pytest.mark.asyncio
 @pytest.mark.parametrize("auth", [True, False])
 async def test_menu(auth):
