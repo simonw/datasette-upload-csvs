@@ -21,9 +21,7 @@ async def test_lifespan():
 async def test_redirect():
     datasette = Datasette([], memory=True)
     async with httpx.AsyncClient(app=datasette.app()) as client:
-        response = await client.get(
-            "http://localhost/-/upload-csv", allow_redirects=False
-        )
+        response = await client.get("http://localhost/-/upload-csv")
         assert response.status_code == 302
         assert response.headers["location"] == "/-/upload-csvs"
 
@@ -66,7 +64,7 @@ async def test_upload(tmpdir):
         cookies["ds_csrftoken"] = csrftoken
 
         # Now try uploading a file
-        files = {"csv": ("dogs.csv", "name,age\nCleo,5\nPancakes,4", "text/csv")}
+        files = {"csv": ("dogs.csv", b"name,age\nCleo,5\nPancakes,4", "text/csv")}
         response = await client.post(
             "http://localhost/-/upload-csvs",
             cookies=cookies,
@@ -107,6 +105,5 @@ async def test_permissions(tmpdir):
         response2 = await client2.get(
             "http://localhost/-/upload-csvs",
             cookies={"ds_actor": ds.sign({"a": {"id": "root"}}, "actor")},
-            allow_redirects=False,
         )
         assert 403 != response2.status_code
