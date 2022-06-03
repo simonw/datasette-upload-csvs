@@ -129,10 +129,7 @@ async def upload_csvs(scope, receive, datasette, request):
     if formdata.get("xhr"):
         return Response.json(
             {
-                "url": "/{database}/{table}".format(
-                    database=quote_plus(db.name),
-                    table=quote_plus(filename),
-                ),
+                "url": datasette.urls.table(db.name, filename),
                 "database_path": quote_plus(db.name),
                 "task_id": task_id,
                 "bytes_todo": total_size,
@@ -142,7 +139,11 @@ async def upload_csvs(scope, receive, datasette, request):
     return Response.html(
         await datasette.render_template(
             "upload_csv_done.html",
-            {"database": db.name, "table": filename},
+            {
+                "database": db.name,
+                "table": filename,
+                "table_url": datasette.urls.table(db.name, filename),
+            },
         )
     )
 

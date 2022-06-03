@@ -45,7 +45,15 @@ async def test_menu(auth):
 
 
 @pytest.mark.asyncio
-async def test_upload(tmpdir):
+@pytest.mark.parametrize(
+    "filename,expected_url",
+    (
+        ("dogs.csv", "/data/dogs"),
+        ("weird ~ filename here.csv.csv", "/data/weird~20~7E~20filename~20here~2Ecsv"),
+    ),
+)
+@pytest.mark.parametrize("use_xhr", (True, False))
+async def test_upload(tmpdir, filename, expected_url, use_xhr):
     path = str(tmpdir / "data.db")
     db = sqlite_utils.Database(path)
 
@@ -64,14 +72,18 @@ async def test_upload(tmpdir):
         cookies["ds_csrftoken"] = csrftoken
 
         # Now try uploading a file
-        files = {"csv": ("dogs.csv", b"name,age\nCleo,5\nPancakes,4", "text/csv")}
+        files = {"csv": (filename, b"name,age\nCleo,5\nPancakes,4", "text/csv")}
         response = await client.post(
             "http://localhost/-/upload-csvs",
             cookies=cookies,
-            data={"csrftoken": csrftoken},
+            data={"csrftoken": csrftoken, "xhr": "1" if use_xhr else ""},
             files=files,
         )
-        assert b"<h1>Upload in progress</h1>" in response.content
+        if use_xhr:
+            assert response.json()["url"] == expected_url
+        else:
+            assert "<h1>Upload in progress</h1>" in response.text
+            assert expected_url in response.text
 
         # Now things get tricky... the upload is running in a thread, so poll for completion
         await asyncio.sleep(1)
@@ -81,13 +93,13 @@ async def test_upload(tmpdir):
         rows = json.loads(response.content)
         assert 1 == len(rows)
         assert {
-            "filename": "dogs",
+            "filename": filename[:-4],  # Strip off .csv ending
             "bytes_todo": 26,
             "bytes_done": 26,
             "rows_done": 2,
         }.items() <= rows[0].items()
 
-    dogs = list(db["dogs"].rows)
+    dogs = list(db[filename[:-4]].rows)
     assert [{"name": "Cleo", "age": "5"}, {"name": "Pancakes", "age": "4"}] == dogs
 
 
