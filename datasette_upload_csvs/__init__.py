@@ -1,5 +1,6 @@
 from datasette import hookimpl
 from datasette.utils.asgi import Response, Forbidden
+from charset_normalizer import detect
 from starlette.requests import Request
 from urllib.parse import quote_plus
 import csv as csv_std
@@ -71,6 +72,12 @@ async def upload_csvs(scope, receive, datasette, request):
     total_size = get_temporary_file_size(csv.file)
     task_id = str(uuid.uuid4())
 
+    # Use the first 2MB to detect the character encoding
+    first_bytes = csv.file.read(2048)
+    csv.file.seek(0)
+    encoding = detect(first_bytes)["encoding"]
+    print(encoding)
+
     def insert_initial_record(conn):
         database = sqlite_utils.Database(conn)
         database["_csv_progress_"].insert(
@@ -91,9 +98,7 @@ async def upload_csvs(scope, receive, datasette, request):
     await db.execute_write_fn(insert_initial_record)
 
     def insert_docs(database):
-
-        # TODO: Support other encodings:
-        reader = csv_std.reader(codecs.iterdecode(csv.file, "utf-8"))
+        reader = csv_std.reader(codecs.iterdecode(csv.file, encoding))
         headers = next(reader)
 
         docs = (dict(zip(headers, row)) for row in reader)

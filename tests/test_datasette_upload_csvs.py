@@ -44,16 +44,55 @@ async def test_menu(auth):
                 assert "/-/upload-csvs" not in response.text
 
 
+SIMPLE = b"name,age\nCleo,5\nPancakes,4"
+SIMPLE_EXPECTED = [{"name": "Cleo", "age": "5"}, {"name": "Pancakes", "age": "4"}]
+NOT_UTF8 = (
+    b"IncidentNumber,DateTimeOfCall,CalYear,FinYear,TypeOfIncident,PumpCount,PumpHoursTotal,HourlyNotionalCost(\xa3),IncidentNotionalCost(\xa3)\r\n"
+    b"139091,01/01/2009 03:01,2009,2008/09,Special Service,1,2,255,510\r\n"
+    b"275091,01/01/2009 08:51,2009,2008/09,Special Service,1,1,255,255"
+)
+NOT_UTF8_EXPECTED = [
+    {
+        "IncidentNumber": "139091",
+        "DateTimeOfCall": "01/01/2009 03:01",
+        "CalYear": "2009",
+        "FinYear": "2008/09",
+        "TypeOfIncident": "Special Service",
+        "PumpCount": "1",
+        "PumpHoursTotal": "2",
+        "HourlyNotionalCost(£)": "255",
+        "IncidentNotionalCost(£)": "510",
+    },
+    {
+        "IncidentNumber": "275091",
+        "DateTimeOfCall": "01/01/2009 08:51",
+        "CalYear": "2009",
+        "FinYear": "2008/09",
+        "TypeOfIncident": "Special Service",
+        "PumpCount": "1",
+        "PumpHoursTotal": "1",
+        "HourlyNotionalCost(£)": "255",
+        "IncidentNotionalCost(£)": "255",
+    },
+]
+
+
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "filename,expected_url",
+    "filename,content,expected_url,expected_rows",
     (
-        ("dogs.csv", "/data/dogs"),
-        ("weird ~ filename here.csv.csv", "/data/weird~20~7E~20filename~20here~2Ecsv"),
+        ("dogs.csv", SIMPLE, "/data/dogs", SIMPLE_EXPECTED),
+        (
+            "weird ~ filename here.csv.csv",
+            SIMPLE,
+            "/data/weird~20~7E~20filename~20here~2Ecsv",
+            SIMPLE_EXPECTED,
+        ),
+        ("not-utf8.csv", NOT_UTF8, "/data/not-utf8", NOT_UTF8_EXPECTED),
     ),
 )
 @pytest.mark.parametrize("use_xhr", (True, False))
-async def test_upload(tmpdir, filename, expected_url, use_xhr):
+async def test_upload(tmpdir, filename, content, expected_url, expected_rows, use_xhr):
     path = str(tmpdir / "data.db")
     db = sqlite_utils.Database(path)
 
@@ -72,7 +111,7 @@ async def test_upload(tmpdir, filename, expected_url, use_xhr):
         cookies["ds_csrftoken"] = csrftoken
 
         # Now try uploading a file
-        files = {"csv": (filename, b"name,age\nCleo,5\nPancakes,4", "text/csv")}
+        files = {"csv": (filename, content, "text/csv")}
         response = await client.post(
             "http://localhost/-/upload-csvs",
             cookies=cookies,
@@ -94,13 +133,13 @@ async def test_upload(tmpdir, filename, expected_url, use_xhr):
         assert 1 == len(rows)
         assert {
             "filename": filename[:-4],  # Strip off .csv ending
-            "bytes_todo": 26,
-            "bytes_done": 26,
+            "bytes_todo": len(content),
+            "bytes_done": len(content),
             "rows_done": 2,
         }.items() <= rows[0].items()
 
-    dogs = list(db[filename[:-4]].rows)
-    assert [{"name": "Cleo", "age": "5"}, {"name": "Pancakes", "age": "4"}] == dogs
+    rows = list(db[filename[:-4]].rows)
+    assert rows == expected_rows
 
 
 @pytest.mark.asyncio

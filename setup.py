@@ -30,6 +30,7 @@ setup(
         "starlette",
         "aiofiles",
         "python-multipart",
+        "charset-normalizer",
         "sqlite-utils",
     ],
     extras_require={
