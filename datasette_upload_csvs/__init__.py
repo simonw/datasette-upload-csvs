@@ -82,6 +82,7 @@ async def upload_csvs(scope, receive, datasette, request):
                 "rows_done": 0,
                 "started": str(datetime.datetime.utcnow()),
                 "completed": None,
+                "error": None,
             },
             pk="id",
             alter=True,
@@ -89,8 +90,8 @@ async def upload_csvs(scope, receive, datasette, request):
 
     await db.execute_write_fn(insert_initial_record)
 
-    def insert_docs(conn):
-        database = sqlite_utils.Database(conn)
+    def insert_docs(database):
+
         # TODO: Support other encodings:
         reader = csv_std.reader(codecs.iterdecode(csv.file, "utf-8"))
         headers = next(reader)
@@ -124,7 +125,17 @@ async def upload_csvs(scope, receive, datasette, request):
         )
         return database[filename].count
 
-    await db.execute_write_fn(insert_docs, block=False)
+    def insert_docs_catch_errors(conn):
+        database = sqlite_utils.Database(conn)
+        try:
+            insert_docs(database)
+        except Exception as error:
+            database["_csv_progress_"].update(
+                task_id,
+                {"error": str(error)},
+            )
+
+    await db.execute_write_fn(insert_docs_catch_errors, block=False)
 
     if formdata.get("xhr"):
         return Response.json(

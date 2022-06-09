@@ -128,6 +128,10 @@ function uploadFile(file) {
       var url = `/${data.database_path}/_csv_progress_.json?id=${data.task_id}&_shape=array`;
       function pollForProgress() {
           fetch(url).then(d => d.json()).then(rows => {
+              if (rows[0].error) {
+                alert("An error occurred processing that file:\n\n" + rows[0].error);
+                location.href = location.href;
+              }
               progress.value = (rows[0].bytes_done * 100.0) / rows[0].bytes_todo;
               progressLabel.innerHTML = `Processing... ${Number(rows[0].rows_done).toLocaleString()} rows imported`;
               if (rows[0].bytes_done == rows[0].bytes_todo) {
