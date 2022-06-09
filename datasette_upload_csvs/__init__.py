@@ -87,7 +87,7 @@ async def upload_csvs(scope, receive, datasette, request):
             alter=True,
         )
 
-    await db.execute_write_fn(insert_initial_record, block=True)
+    await db.execute_write_fn(insert_initial_record)
 
     def insert_docs(conn):
         database = sqlite_utils.Database(conn)
@@ -124,7 +124,7 @@ async def upload_csvs(scope, receive, datasette, request):
         )
         return database[filename].count
 
-    await db.execute_write_fn(insert_docs)
+    await db.execute_write_fn(insert_docs, block=False)
 
     if formdata.get("xhr"):
         return Response.json(
