@@ -2,6 +2,7 @@ from datasette.app import Datasette
 import asyncio
 from asgi_lifespan import LifespanManager
 import json
+from unittest.mock import ANY
 import pytest
 import httpx
 import sqlite_utils
@@ -75,6 +76,9 @@ NOT_UTF8_EXPECTED = [
         "IncidentNotionalCost(£)": "255",
     },
 ]
+LATIN1_AFTER_FIRST_2KB = ("just_one_column\n" + "aabbcc\n" * 1048 + "a.b.é").encode(
+    "latin-1"
+)
 
 
 @pytest.mark.asyncio
@@ -89,12 +93,19 @@ NOT_UTF8_EXPECTED = [
             SIMPLE_EXPECTED,
         ),
         ("not-utf8.csv", NOT_UTF8, "/data/not-utf8", NOT_UTF8_EXPECTED),
+        ("latin1-after-x.csv", "LATIN1_AFTER_FIRST_2KB", "/data/latin1-after-x", ANY),
     ),
 )
 @pytest.mark.parametrize("use_xhr", (True, False))
 async def test_upload(tmpdir, filename, content, expected_url, expected_rows, use_xhr):
     path = str(tmpdir / "data.db")
     db = sqlite_utils.Database(path)
+    db.vacuum()
+    db.enable_wal()
+    binary_content = content
+    # Trick to avoid a 12MB string being part of the pytest rendered test name:
+    if content == "LATIN1_AFTER_FIRST_2KB":
+        binary_content = LATIN1_AFTER_FIRST_2KB
 
     db["hello"].insert({"hello": "world"})
 
@@ -111,9 +122,13 @@ async def test_upload(tmpdir, filename, content, expected_url, expected_rows, us
         cookies["ds_csrftoken"] = csrftoken
 
         # Now try uploading a file
-        files = {"csv": (filename, content, "text/csv")}
+        files = {"csv": (filename, binary_content, "text/csv")}
         response = await client.post(
-            "http://localhost/-/upload-csvs",
+            "http://localhost/-/upload-csvs{}".format(
+                "?_num_bytes_to_detect_with=2048"
+                if content == "LATIN1_AFTER_FIRST_2KB"
+                else ""
+            ),
             cookies=cookies,
             data={"csrftoken": csrftoken, "xhr": "1" if use_xhr else ""},
             files=files,
@@ -125,18 +140,22 @@ async def test_upload(tmpdir, filename, content, expected_url, expected_rows, us
             assert expected_url in response.text
 
         # Now things get tricky... the upload is running in a thread, so poll for completion
-        await asyncio.sleep(1)
-        response = await client.get(
-            "http://localhost/data/_csv_progress_.json?_shape=array"
-        )
-        rows = json.loads(response.content)
-        assert 1 == len(rows)
-        assert {
-            "filename": filename[:-4],  # Strip off .csv ending
-            "bytes_todo": len(content),
-            "bytes_done": len(content),
-            "rows_done": 2,
-        }.items() <= rows[0].items()
+        fail_after = 20
+        iterations = 0
+        while True:
+            response = await client.get(
+                "http://localhost/data/_csv_progress_.json?_shape=array"
+            )
+            rows = json.loads(response.content)
+            assert 1 == len(rows)
+            row = rows[0]
+            assert row["filename"] == filename[:-4]
+            assert not row["error"], row
+            if row["bytes_todo"] == row["bytes_done"]:
+                break
+            iterations += 1
+            assert iterations < fail_after, "Took too long: {}".format(row)
+            await asyncio.sleep(0.5)
 
     rows = list(db[filename[:-4]].rows)
     assert rows == expected_rows

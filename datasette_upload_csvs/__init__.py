@@ -43,6 +43,11 @@ async def upload_csvs(scope, receive, datasette, request):
     ):
         raise Forbidden("Permission denied for upload-csvs")
 
+    num_bytes_to_detect_with = 2048 * 1024
+    # ?_num_bytes= can over-ride this, used by the tests
+    if request.args.get("_num_bytes_to_detect_with"):
+        num_bytes_to_detect_with = int(request.args["_num_bytes_to_detect_with"])
+
     # For the moment just use the first database that's not immutable
     db = [
         db
@@ -73,10 +78,14 @@ async def upload_csvs(scope, receive, datasette, request):
     task_id = str(uuid.uuid4())
 
     # Use the first 2MB to detect the character encoding
-    first_bytes = csv.file.read(2048)
+    first_bytes = csv.file.read(num_bytes_to_detect_with)
     csv.file.seek(0)
     encoding = detect(first_bytes)["encoding"]
-    print(encoding)
+
+    # latin-1 is a superset of ascii, and less likely to hit errors
+    # https://github.com/simonw/datasette-upload-csvs/issues/25
+    if encoding == "ascii":
+        encoding = "latin-1"
 
     def insert_initial_record(conn):
         database = sqlite_utils.Database(conn)
