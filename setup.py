@@ -18,7 +18,12 @@ setup(
     long_description=get_long_description(),
     long_description_content_type="text/markdown",
     author="Simon Willison",
-    url="https://github.com/simonw/datasette-upload-csvs",
+    url="https://datasette.io/plugins/datasette-upload-csvs",
+    project_urls={
+        "Issues": "https://github.com/simonw/datasette-upload-csvs/issues",
+        "CI": "https://github.com/simonw/datasette-upload-csvs/actions",
+        "Changelog": "https://github.com/simonw/datasette-upload-csvs/releases",
+    },
     license="Apache License, Version 2.0",
     version=VERSION,
     packages=["datasette_upload_csvs"],
