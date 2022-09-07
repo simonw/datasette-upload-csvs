@@ -9,6 +9,7 @@ import datetime
 import io
 import os
 import sqlite_utils
+from sqlite_utils.utils import TypeTracker
 import uuid
 
 
@@ -110,7 +111,9 @@ async def upload_csvs(scope, receive, datasette, request):
         reader = csv_std.reader(codecs.iterdecode(csv.file, encoding))
         headers = next(reader)
 
-        docs = (dict(zip(headers, row)) for row in reader)
+        tracker = TypeTracker()
+
+        docs = tracker.wrap(dict(zip(headers, row)) for row in reader)
 
         i = 0
 
@@ -137,6 +140,8 @@ async def upload_csvs(scope, receive, datasette, request):
                 "completed": str(datetime.datetime.utcnow()),
             },
         )
+        # Trasform columns to detected types
+        database[filename].transform(types=tracker.types)
         return database[filename].count
 
     def insert_docs_catch_errors(conn):

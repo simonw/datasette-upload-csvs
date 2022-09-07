@@ -46,34 +46,34 @@ async def test_menu(auth):
 
 
 SIMPLE = b"name,age\nCleo,5\nPancakes,4"
-SIMPLE_EXPECTED = [{"name": "Cleo", "age": "5"}, {"name": "Pancakes", "age": "4"}]
+SIMPLE_EXPECTED = [{"name": "Cleo", "age": 5}, {"name": "Pancakes", "age": 4}]
 NOT_UTF8 = (
     b"IncidentNumber,DateTimeOfCall,CalYear,FinYear,TypeOfIncident,PumpCount,PumpHoursTotal,HourlyNotionalCost(\xa3),IncidentNotionalCost(\xa3)\r\n"
-    b"139091,01/01/2009 03:01,2009,2008/09,Special Service,1,2,255,510\r\n"
-    b"275091,01/01/2009 08:51,2009,2008/09,Special Service,1,1,255,255"
+    b"139091,01/01/2009 03:01,2009,2008/09,Special Service,1,2,2.55,5.10\r\n"
+    b"275091,01/01/2009 08:51,2009,2008/09,Special Service,1,1,2.55,2.55"
 )
 NOT_UTF8_EXPECTED = [
     {
-        "IncidentNumber": "139091",
+        "IncidentNumber": 139091,
         "DateTimeOfCall": "01/01/2009 03:01",
-        "CalYear": "2009",
+        "CalYear": 2009,
         "FinYear": "2008/09",
         "TypeOfIncident": "Special Service",
-        "PumpCount": "1",
-        "PumpHoursTotal": "2",
-        "HourlyNotionalCost(£)": "255",
-        "IncidentNotionalCost(£)": "510",
+        "PumpCount": 1,
+        "PumpHoursTotal": 2,
+        "HourlyNotionalCost(£)": 2.55,
+        "IncidentNotionalCost(£)": 5.10,
     },
     {
-        "IncidentNumber": "275091",
+        "IncidentNumber": 275091,
         "DateTimeOfCall": "01/01/2009 08:51",
-        "CalYear": "2009",
+        "CalYear": 2009,
         "FinYear": "2008/09",
         "TypeOfIncident": "Special Service",
-        "PumpCount": "1",
-        "PumpHoursTotal": "1",
-        "HourlyNotionalCost(£)": "255",
-        "IncidentNotionalCost(£)": "255",
+        "PumpCount": 1,
+        "PumpHoursTotal": 1,
+        "HourlyNotionalCost(£)": 2.55,
+        "IncidentNotionalCost(£)": 2.55,
     },
 ]
 LATIN1_AFTER_FIRST_2KB = ("just_one_column\n" + "aabbcc\n" * 1048 + "a.b.é").encode(
