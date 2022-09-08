@@ -30,8 +30,12 @@ async def test_redirect():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize("auth", [True, False])
-async def test_menu(auth):
-    ds = Datasette([], memory=True)
+@pytest.mark.parametrize("has_database", [True, False])
+async def test_menu(tmpdir, auth, has_database):
+    path = str(tmpdir / "data.db")
+    db = sqlite_utils.Database(path)
+    db.vacuum()
+    ds = Datasette([path] if has_database else [], memory=True)
     app = ds.app()
     async with LifespanManager(app):
         async with httpx.AsyncClient(app=app) as client:
@@ -39,11 +43,22 @@ async def test_menu(auth):
             if auth:
                 cookies = {"ds_actor": ds.sign({"a": {"id": "root"}}, "actor")}
             response = await client.get("http://localhost/", cookies=cookies)
-            assert 200 == response.status_code
-            if auth:
+            assert response.status_code == 200
+            should_allow = False
+            if auth and has_database:
                 assert "/-/upload-csvs" in response.text
+                should_allow = True
             else:
                 assert "/-/upload-csvs" not in response.text
+                should_allow == False
+            assert (
+                (
+                    await client.get("http://localhost/-/upload-csvs", cookies=cookies)
+                ).status_code
+                == 200
+                if should_allow
+                else 403
+            )
 
 
 SIMPLE = b"name,age\nCleo,5\nPancakes,4"

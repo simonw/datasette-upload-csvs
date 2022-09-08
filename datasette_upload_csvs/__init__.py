@@ -30,7 +30,13 @@ def register_routes():
 @hookimpl
 def menu_links(datasette, actor):
     async def inner():
-        if await datasette.permission_allowed(actor, "upload-csvs", default=False):
+        if await datasette.permission_allowed(
+            actor, "upload-csvs", default=False
+        ) and any(
+            db.is_mutable and db.name not in ("_memory", "_internal")
+            for db in datasette.databases.values()
+        ):
+            print(datasette.databases.values())
             return [
                 {"href": datasette.urls.path("/-/upload-csvs"), "label": "Upload CSVs"},
             ]
@@ -50,11 +56,14 @@ async def upload_csvs(scope, receive, datasette, request):
         num_bytes_to_detect_with = int(request.args["_num_bytes_to_detect_with"])
 
     # For the moment just use the first database that's not immutable
-    db = [
+    dbs = [
         db
         for db in datasette.databases.values()
-        if db.is_mutable and db.name != "_internal"
-    ][0]
+        if db.is_mutable and db.name not in ("_internal", "_memory")
+    ]
+    if not dbs:
+        raise Forbidden("No mutable databases available")
+    db = dbs[0]
 
     # We need the ds_request to pass to render_template for CSRF tokens
     ds_request = request
