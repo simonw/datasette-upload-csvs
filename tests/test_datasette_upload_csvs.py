@@ -89,7 +89,7 @@ LATIN1_AFTER_FIRST_2KB = ("just_one_column\n" + "aabbcc\n" * 1048 + "a.b.é").en
         (
             "weird ~ filename here.csv.csv",
             SIMPLE,
-            "/data/weird~20~7E~20filename~20here~2Ecsv",
+            '/data/weird+~7E+filename+here~2Ecsv',
             SIMPLE_EXPECTED,
         ),
         ("not-utf8.csv", NOT_UTF8, "/data/not-utf8", NOT_UTF8_EXPECTED),
