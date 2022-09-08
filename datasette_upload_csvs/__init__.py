@@ -36,7 +36,6 @@ def menu_links(datasette, actor):
             db.is_mutable and db.name not in ("_memory", "_internal")
             for db in datasette.databases.values()
         ):
-            print(datasette.databases.values())
             return [
                 {"href": datasette.urls.path("/-/upload-csvs"), "label": "Upload CSVs"},
             ]
