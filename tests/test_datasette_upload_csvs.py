@@ -1,4 +1,5 @@
 from datasette.app import Datasette
+from datasette.utils import tilde_encode
 import asyncio
 from asgi_lifespan import LifespanManager
 import json
@@ -83,25 +84,31 @@ LATIN1_AFTER_FIRST_2KB = ("just_one_column\n" + "aabbcc\n" * 1048 + "a.b.é").en
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize(
-    "filename,content,expected_url,expected_rows",
+    "filename,content,expected_table,expected_rows",
     (
-        ("dogs.csv", SIMPLE, "/data/dogs", SIMPLE_EXPECTED),
+        ("dogs.csv", SIMPLE, "dogs", SIMPLE_EXPECTED),
         (
             "weird ~ filename here.csv.csv",
             SIMPLE,
-            '/data/weird+~7E+filename+here~2Ecsv',
+            "weird ~ filename here.csv",
             SIMPLE_EXPECTED,
         ),
-        ("not-utf8.csv", NOT_UTF8, "/data/not-utf8", NOT_UTF8_EXPECTED),
-        ("latin1-after-x.csv", "LATIN1_AFTER_FIRST_2KB", "/data/latin1-after-x", ANY),
+        ("not-utf8.csv", NOT_UTF8, "not-utf8", NOT_UTF8_EXPECTED),
+        ("latin1-after-x.csv", "LATIN1_AFTER_FIRST_2KB", "latin1-after-x", ANY),
+        # This table already exists
+        ("already_exists.csv", SIMPLE, "already_exists_2", SIMPLE_EXPECTED),
     ),
 )
 @pytest.mark.parametrize("use_xhr", (True, False))
-async def test_upload(tmpdir, filename, content, expected_url, expected_rows, use_xhr):
+async def test_upload(
+    tmpdir, filename, content, expected_table, expected_rows, use_xhr
+):
+    expected_url = "/data/{}".format(tilde_encode(expected_table))
     path = str(tmpdir / "data.db")
     db = sqlite_utils.Database(path)
     db.vacuum()
     db.enable_wal()
+    db["already_exists"].insert({"id": 1})
     binary_content = content
     # Trick to avoid a 12MB string being part of the pytest rendered test name:
     if content == "LATIN1_AFTER_FIRST_2KB":
@@ -152,7 +159,7 @@ async def test_upload(tmpdir, filename, content, expected_url, expected_rows, us
             rows = json.loads(response.content)
             assert 1 == len(rows)
             row = rows[0]
-            assert row["table_name"] == filename[:-4]
+            assert row["table_name"] == expected_table
             assert not row["error"], row
             if row["bytes_todo"] == row["bytes_done"]:
                 break
@@ -160,7 +167,7 @@ async def test_upload(tmpdir, filename, content, expected_url, expected_rows, us
             assert iterations < fail_after, "Took too long: {}".format(row)
             await asyncio.sleep(0.5)
 
-    rows = list(db[filename[:-4]].rows)
+    rows = list(db[expected_table].rows)
     assert rows == expected_rows
 
 
