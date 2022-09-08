@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Upload a CSV to {{ database_name }}{% endblock %}
+{% block title %}Upload a CSV to "{{ database_name }}"{% endblock %}
 
 {% block extra_head %}
 {{ super() }}
@@ -47,26 +47,34 @@ progress::-webkit-progress-value {
 
 {% block content %}
 <h1>Upload a CSV</h1>
-<p>CSV will be imported into <strong>{{ database_name }}</strong></p>
-<form action="/-/upload-csvs" method="post" enctype="multipart/form-data">
+<p>A table will be created in database "<strong><a href="{{ urls.database(database_name) }}">{{ database_name }}</a></strong>".</p>
+<form action="/-/upload-csvs" id="uploadForm" method="post" enctype="multipart/form-data">
 <div id="file-drop">
+    <input type="hidden" name="csrftoken" value="{{ csrftoken() }}">
     <input type="file" name="csv" id="csvUpload">
     <label for="csvUpload">Select a file to upload or drag and drop one here</label>
 </div>
 <p style="margin-bottom: -0.8em;font-size: 0.8em; display: none;" id="progress-label">Uploading...</p>
 <progress class="progress" value="0" max="100">Uploading...</progress>
+<p style="margin-top: 1em">
+    <label for="id_table_name">Table name</label>
+    <input required id="id_table_name" type="text" name="table_name">
+</p>
+<p><input type="submit" value="Upload file" class="button"></p>
 </form>
 </div>
 
 <script>
+var uploadForm = document.getElementById("uploadForm");
 var fileInput = document.getElementsByName("csv")[0];
 var dropArea = document.getElementById("file-drop");
 var progress = document.getElementsByTagName("progress")[0];
 var progressLabel = document.getElementById("progress-label");
 var label = dropArea.getElementsByTagName("label")[0];
+var tableName = document.getElementById("id_table_name");
 progress.style.display = "none";
 fileInput.addEventListener("change", () => {
-  uploadFile(fileInput.files[0]);
+  setFile(fileInput.files[0]);
 });
 ["dragenter", "dragover", "dragleave", "drop"].forEach(eventName => {
   dropArea.addEventListener(
@@ -101,13 +109,45 @@ fileInput.addEventListener("change", () => {
 dropArea.addEventListener(
   "drop",
   e => {
-    uploadFile(e.dataTransfer.files[0]);
+    setFile(e.dataTransfer.files[0]);
   },
   false
 );
 
-function uploadFile(file) {
+function formattedBytes(bytes) {
+  if (bytes < 1024) {
+    return bytes + " bytes";
+  }
+  if (bytes < 1024 * 1024) {
+    return (bytes / 1024).toFixed(1) + " KB";
+  }
+  if (bytes < 1024 * 1024 * 1024) {
+    return (bytes / 1024 / 1024).toFixed(1) + " MB";
+  }
+  if (bytes < 1024 * 1024 * 1024 * 1024) {
+    return (bytes / 1024 / 1024 / 1024).toFixed(1) + " GB";
+  }
+}
+
+function setFile(file) {
+  if (fileInput.files[0] != file) {
+    fileInput.files[0] = file;
+  }
   label.innerText = file.name;
+  label.innerHTML += '<br><span style="font-size: 0.9em">' + formattedBytes(file.size) + '</span>';
+  if (!tableName.value.trim()) {
+    tableName.value = file.name.replace(/\.csv$/i, "").trim();
+  }
+}
+
+// Onsubmit handler
+uploadForm.addEventListener("submit", ev => {
+  ev.preventDefault();
+  var file = fileInput.files[0];
+  if (!file || !tableName.value.trim()) {
+    alert("Please select a file and enter a table name");
+    return;
+  }
   var xhr = new XMLHttpRequest();
   var formData = new FormData();
   dropArea.style.display = "none";
@@ -128,19 +168,19 @@ function uploadFile(file) {
       progress.value = 0;
       var url = `/${data.database_path}/_csv_progress_.json?id=${data.task_id}&_shape=array`;
       function pollForProgress() {
-          fetch(url).then(d => d.json()).then(rows => {
-              if (rows[0].error) {
-                alert("An error occurred processing that file:\n\n" + rows[0].error);
-                location.href = location.href;
-              }
-              progress.value = (rows[0].bytes_done * 100.0) / rows[0].bytes_todo;
-              progressLabel.innerHTML = `Processing... ${Number(rows[0].rows_done).toLocaleString()} rows imported`;
-              if (rows[0].bytes_done == rows[0].bytes_todo) {
-                  document.location = JSON.parse(xhr.responseText).url;
-              } else {
-                  setTimeout(pollForProgress, 1000);
-              }
-          });
+        fetch(url).then(d => d.json()).then(rows => {
+          if (rows[0].error) {
+            alert("An error occurred processing that file:\n\n" + rows[0].error);
+            location.href = location.href;
+          }
+          progress.value = (rows[0].bytes_done * 100.0) / rows[0].bytes_todo;
+          progressLabel.innerHTML = `Processing... ${Number(rows[0].rows_done).toLocaleString()} rows imported`;
+          if (rows[0].bytes_done == rows[0].bytes_todo) {
+              document.location = JSON.parse(xhr.responseText).url;
+          } else {
+              setTimeout(pollForProgress, 1000);
+          }
+        });
       }
       pollForProgress();
     } else if (xhr.readyState == 4 && xhr.status != 200) {
@@ -151,7 +191,8 @@ function uploadFile(file) {
   formData.append("xhr", "1");
   formData.append("csrftoken", "{{ csrftoken() }}");
   formData.append("csv", file);
+  formData.append("table", tableName.value);
   xhr.send(formData);
-}
+});
 </script>
 {% endblock %}

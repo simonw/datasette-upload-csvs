@@ -71,9 +71,11 @@ async def upload_csvs(scope, receive, datasette, request):
     formdata = await starlette_request.form()
     csv = formdata["csv"]
     # csv.file is a SpooledTemporaryFile. csv.filename is the filename
-    filename = csv.filename
-    if filename.endswith(".csv"):
-        filename = filename[:-4]
+    table_name = formdata.get("table")
+    if not table_name:
+        table_name = csv.filename
+        if table_name.endswith(".csv"):
+            table_name = table_name[:-4]
 
     total_size = get_temporary_file_size(csv.file)
     task_id = str(uuid.uuid4())
@@ -93,7 +95,7 @@ async def upload_csvs(scope, receive, datasette, request):
         database["_csv_progress_"].insert(
             {
                 "id": task_id,
-                "filename": filename,
+                "table_name": table_name,
                 "bytes_todo": total_size,
                 "bytes_done": 0,
                 "rows_done": 0,
@@ -131,7 +133,9 @@ async def upload_csvs(scope, receive, datasette, request):
                         },
                     )
 
-        database[filename].insert_all(docs_with_progress(), alter=True, batch_size=100)
+        database[table_name].insert_all(
+            docs_with_progress(), alter=True, batch_size=100
+        )
         database["_csv_progress_"].update(
             task_id,
             {
@@ -141,8 +145,8 @@ async def upload_csvs(scope, receive, datasette, request):
             },
         )
         # Trasform columns to detected types
-        database[filename].transform(types=tracker.types)
-        return database[filename].count
+        database[table_name].transform(types=tracker.types)
+        return database[table_name].count
 
     def insert_docs_catch_errors(conn):
         database = sqlite_utils.Database(conn)
@@ -159,7 +163,7 @@ async def upload_csvs(scope, receive, datasette, request):
     if formdata.get("xhr"):
         return Response.json(
             {
-                "url": datasette.urls.table(db.name, filename),
+                "url": datasette.urls.table(db.name, table_name),
                 "database_path": quote_plus(db.name),
                 "task_id": task_id,
                 "bytes_todo": total_size,
@@ -171,8 +175,8 @@ async def upload_csvs(scope, receive, datasette, request):
             "upload_csv_done.html",
             {
                 "database": db.name,
-                "table": filename,
-                "table_url": datasette.urls.table(db.name, filename),
+                "table": table_name,
+                "table_url": datasette.urls.table(db.name, table_name),
             },
         )
     )

@@ -117,7 +117,10 @@ async def test_upload(tmpdir, filename, content, expected_url, expected_rows, us
     async with httpx.AsyncClient(app=datasette.app()) as client:
         response = await client.get("http://localhost/-/upload-csvs", cookies=cookies)
         assert 200 == response.status_code
-        assert b'<form action="/-/upload-csvs" method="post"' in response.content
+        assert (
+            '<form action="/-/upload-csvs" id="uploadForm" method="post"'
+            in response.text
+        )
         csrftoken = response.cookies["ds_csrftoken"]
         cookies["ds_csrftoken"] = csrftoken
 
@@ -149,7 +152,7 @@ async def test_upload(tmpdir, filename, content, expected_url, expected_rows, us
             rows = json.loads(response.content)
             assert 1 == len(rows)
             row = rows[0]
-            assert row["filename"] == filename[:-4]
+            assert row["table_name"] == filename[:-4]
             assert not row["error"], row
             if row["bytes_todo"] == row["bytes_done"]:
                 break
