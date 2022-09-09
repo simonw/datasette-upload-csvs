@@ -2,6 +2,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/datasette-upload-csvs.svg)](https://pypi.org/project/datasette-upload-csvs/)
 [![Changelog](https://img.shields.io/github/v/release/simonw/datasette-upload-csvs?include_prereleases&label=changelog)](https://github.com/simonw/datasette-upload-csvs/releases)
+[![Tests](https://github.com/simonw/datasette-upload-csvs/workflows/Test/badge.svg)](https://github.com/simonw/datasette-upload-csvs/actions?query=workflow%3ATest)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/simonw/datasette-upload-csvs/blob/main/LICENSE)
 
 Datasette plugin for uploading CSV files and converting them to database tables
