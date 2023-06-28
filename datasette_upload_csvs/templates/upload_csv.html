@@ -72,6 +72,10 @@ var progress = document.getElementsByTagName("progress")[0];
 var progressLabel = document.getElementById("progress-label");
 var label = dropArea.getElementsByTagName("label")[0];
 var tableName = document.getElementById("id_table_name");
+
+// State that holds the most-recent uploaded File, from a FileList
+let currentFile = null;
+
 progress.style.display = "none";
 fileInput.addEventListener("change", () => {
   setFile(fileInput.files[0]);
@@ -130,8 +134,8 @@ function formattedBytes(bytes) {
 }
 
 function setFile(file) {
-  if (fileInput.files[0] != file) {
-    fileInput.files[0] = file;
+  if (currentFile != file) {
+    currentFile = file;
   }
   label.innerText = file.name;
   label.innerHTML += '<br><span style="font-size: 0.9em">' + formattedBytes(file.size) + '</span>';
@@ -143,9 +147,12 @@ function setFile(file) {
 // Onsubmit handler
 uploadForm.addEventListener("submit", ev => {
   ev.preventDefault();
-  var file = fileInput.files[0];
-  if (!file || !tableName.value.trim()) {
-    alert("Please select a file and enter a table name");
+  if (!tableName.value.trim()) {
+    alert("Please enter a table name");
+    return;
+  }
+  if (!currentFile) {
+    alert("Please select a file");
     return;
   }
   var xhr = new XMLHttpRequest();
@@ -190,7 +197,7 @@ uploadForm.addEventListener("submit", ev => {
 
   formData.append("xhr", "1");
   formData.append("csrftoken", "{{ csrftoken() }}");
-  formData.append("csv", file);
+  formData.append("csv", currentFile);
   formData.append("table", tableName.value);
   xhr.send(formData);
 });
