@@ -135,6 +135,8 @@ async def test_upload(
 
     cookies = {"ds_actor": datasette.sign({"a": {"id": "root"}}, "actor")}
 
+    internal_db = datasette.get_internal_database()
+
     # First test the upload page exists
     async with httpx.AsyncClient(app=datasette.app()) as client:
         response = await client.get("http://localhost/-/upload-csvs", cookies=cookies)
@@ -168,12 +170,9 @@ async def test_upload(
         fail_after = 20
         iterations = 0
         while True:
-            response = await client.get(
-                "http://localhost/data/_csv_progress_.json?_shape=array"
-            )
-            rows = json.loads(response.content)
-            assert 1 == len(rows)
-            row = rows[0]
+            result = await internal_db.execute("select * from _csv_progress_")
+            assert 1 == len(result.rows)
+            row = result.rows[0]
             assert row["table_name"] == expected_table
             assert not row["error"], row
             if row["bytes_todo"] == row["bytes_done"]:

@@ -64,6 +64,19 @@ async def upload_csvs(scope, receive, datasette, request):
         raise Forbidden("No mutable databases available")
     db = dbs[0]
 
+
+    internal_db = None
+
+    # get_internal_database() returns a datasette.Database, but we want a
+    # sqlite_utils.Database. This is one option to capture the underlying
+    # sqlite3.Connection
+    def capture_internal_db(conn):
+        nonlocal internal_db
+        internal_db = sqlite_utils.Database(conn)
+
+    await datasette.get_internal_database().execute_write_fn(capture_internal_db, block=True)
+
+
     # We need the ds_request to pass to render_template for CSRF tokens
     ds_request = request
 
@@ -105,9 +118,8 @@ async def upload_csvs(scope, receive, datasette, request):
     if encoding == "ascii":
         encoding = "latin-1"
 
-    def insert_initial_record(conn):
-        database = sqlite_utils.Database(conn)
-        database["_csv_progress_"].insert(
+    # inserting the initial record
+    internal_db["_csv_progress_"].insert(
             {
                 "id": task_id,
                 "table_name": table_name,
@@ -121,8 +133,6 @@ async def upload_csvs(scope, receive, datasette, request):
             pk="id",
             alter=True,
         )
-
-    await db.execute_write_fn(insert_initial_record)
 
     def insert_docs(database):
         reader = csv_std.reader(codecs.iterdecode(csv.file, encoding))
@@ -140,7 +150,7 @@ async def upload_csvs(scope, receive, datasette, request):
                 i += 1
                 yield doc
                 if i % 10 == 0:
-                    database["_csv_progress_"].update(
+                    internal_db["_csv_progress_"].update(
                         task_id,
                         {
                             "rows_done": i,
@@ -151,7 +161,7 @@ async def upload_csvs(scope, receive, datasette, request):
         database[table_name].insert_all(
             docs_with_progress(), alter=True, batch_size=100
         )
-        database["_csv_progress_"].update(
+        internal_db["_csv_progress_"].update(
             task_id,
             {
                 "rows_done": i,
@@ -168,7 +178,7 @@ async def upload_csvs(scope, receive, datasette, request):
         try:
             insert_docs(database)
         except Exception as error:
-            database["_csv_progress_"].update(
+            internal_db["_csv_progress_"].update(
                 task_id,
                 {"error": str(error)},
             )
