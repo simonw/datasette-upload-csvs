@@ -159,19 +159,20 @@ async def upload_csvs(scope, receive, datasette, request):
                 "completed": str(datetime.datetime.utcnow()),
             },
         )
-        # Trasform columns to detected types
+        # Transform columns to detected types
         database[table_name].transform(types=tracker.types)
         return database[table_name].count
 
     def insert_docs_catch_errors(conn):
         database = sqlite_utils.Database(conn)
-        try:
-            insert_docs(database)
-        except Exception as error:
-            database["_csv_progress_"].update(
-                task_id,
-                {"error": str(error)},
-            )
+        with conn:
+            try:
+                insert_docs(database)
+            except Exception as error:
+                database["_csv_progress_"].update(
+                    task_id,
+                    {"error": str(error)},
+                )
 
     await db.execute_write_fn(insert_docs_catch_errors, block=False)
 
