@@ -7,24 +7,23 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.7", "3.8", "3.9", "3.10"]
+        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11"]
+        datasette-version: ["<1.0", ">=1.0a7"]
+        exclude:
+        - python-version: "3.7"
+          datasette-version: ">=1.0a7"
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
-    - uses: actions/cache@v2
-      name: Configure pip caching
-      with:
-        path: ~/.cache/pip
-        key: ${{ runner.os }}-pip-${{ hashFiles('**/setup.py') }}
-        restore-keys: |
-          ${{ runner.os }}-pip-
+        cache: pip
+        cache-dependency-path: setup.py
     - name: Install dependencies
       run: |
         pip install -e '.[test]'
+        pip install "datasette${{ matrix.datasette-version }}"
     - name: Run tests
       run: |
         pytest
-
