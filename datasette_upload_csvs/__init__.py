@@ -205,9 +205,10 @@ async def upload_csvs(scope, receive, datasette, request):
                 database = sqlite_utils.Database(conn)
                 database[table_name].transform(types=tracker.types)
 
-            asyncio.run_coroutine_threadsafe(
+            future = asyncio.run_coroutine_threadsafe(
                 db.execute_write_fn(transform_columns), event_loop
             )
+            future.result()
         except Exception as error:
 
             def insert_error(conn):
