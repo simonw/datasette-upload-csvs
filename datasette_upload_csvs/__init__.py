@@ -155,21 +155,18 @@ async def upload_csvs(scope, receive, datasette, request):
                                 },
                             )
 
-                        future = asyncio.run_coroutine_threadsafe(
+                        asyncio.run_coroutine_threadsafe(
                             db.execute_write_fn(update_progress), event_loop
-                        )
-                        future.result()
+                        ).result()
 
             def write_batch(batch):
                 def insert_batch(conn):
                     database = sqlite_utils.Database(conn)
                     database[table_name].insert_all(batch, alter=True)
 
-                future = asyncio.run_coroutine_threadsafe(
+                asyncio.run_coroutine_threadsafe(
                     db.execute_write_fn(insert_batch), event_loop
-                )
-                # Wait for it to finish so we don't overwhelm write queue
-                future.result()
+                ).result()
 
             batch = []
             batch_size = 0
@@ -197,20 +194,18 @@ async def upload_csvs(scope, receive, datasette, request):
                     },
                 )
 
-            future = asyncio.run_coroutine_threadsafe(
+            asyncio.run_coroutine_threadsafe(
                 db.execute_write_fn(mark_complete), event_loop
-            )
-            future.result()
+            ).result()
 
             # Transform columns to detected types
             def transform_columns(conn):
                 database = sqlite_utils.Database(conn)
                 database[table_name].transform(types=tracker.types)
 
-            future = asyncio.run_coroutine_threadsafe(
+            asyncio.run_coroutine_threadsafe(
                 db.execute_write_fn(transform_columns), event_loop
-            )
-            future.result()
+            ).result()
         except Exception as error:
 
             def insert_error(conn):
@@ -220,10 +215,9 @@ async def upload_csvs(scope, receive, datasette, request):
                     {"error": str(error)},
                 )
 
-            future = asyncio.run_coroutine_threadsafe(
+            asyncio.run_coroutine_threadsafe(
                 db.execute_write_fn(insert_error), event_loop
-            )
-            future.result()
+            ).result()
 
     loop = asyncio.get_running_loop()
 
