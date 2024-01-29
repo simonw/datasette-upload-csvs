@@ -155,9 +155,10 @@ async def upload_csvs(scope, receive, datasette, request):
                                 },
                             )
 
-                        asyncio.run_coroutine_threadsafe(
+                        future = asyncio.run_coroutine_threadsafe(
                             db.execute_write_fn(update_progress), event_loop
                         )
+                        future.result()
 
             def write_batch(batch):
                 def insert_batch(conn):
@@ -196,9 +197,10 @@ async def upload_csvs(scope, receive, datasette, request):
                     },
                 )
 
-            asyncio.run_coroutine_threadsafe(
+            future = asyncio.run_coroutine_threadsafe(
                 db.execute_write_fn(mark_complete), event_loop
             )
+            future.result()
 
             # Transform columns to detected types
             def transform_columns(conn):
@@ -218,9 +220,10 @@ async def upload_csvs(scope, receive, datasette, request):
                     {"error": str(error)},
                 )
 
-            asyncio.run_coroutine_threadsafe(
+            future = asyncio.run_coroutine_threadsafe(
                 db.execute_write_fn(insert_error), event_loop
             )
+            future.result()
 
     loop = asyncio.get_running_loop()
 
