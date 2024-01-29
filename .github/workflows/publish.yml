@@ -27,6 +27,7 @@ jobs:
       run: |
         pip install -e '.[test]'
     - name: Run tests
+      timeout-minutes: 1
       run: |
         pytest
   deploy:

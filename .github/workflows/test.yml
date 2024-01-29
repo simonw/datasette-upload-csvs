@@ -26,5 +26,6 @@ jobs:
         pip install -e '.[test]'
         pip install "datasette${{ matrix.datasette-version }}"
     - name: Run tests
+      timeout-minutes: 1
       run: |
         pytest
