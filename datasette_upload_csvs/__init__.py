@@ -109,27 +109,29 @@ async def upload_csvs(scope, receive, datasette, request):
 
     def insert_initial_record(conn):
         database = sqlite_utils.Database(conn)
-        database["_csv_progress_"].insert(
-            {
-                "id": task_id,
-                "table_name": table_name,
-                "bytes_todo": total_size,
-                "bytes_done": 0,
-                "rows_done": 0,
-                "started": str(datetime.datetime.utcnow()),
-                "completed": None,
-                "error": None,
-            },
-            pk="id",
-            alter=True,
-        )
+        with conn:
+            database["_csv_progress_"].insert(
+                {
+                    "id": task_id,
+                    "table_name": table_name,
+                    "bytes_todo": total_size,
+                    "bytes_done": 0,
+                    "rows_done": 0,
+                    "started": str(datetime.datetime.utcnow()),
+                    "completed": None,
+                    "error": None,
+                },
+                pk="id",
+                alter=True,
+            )
 
     await db.execute_write_fn(insert_initial_record)
 
     def make_insert_batch(batch):
         def inner(conn):
             db = sqlite_utils.Database(conn)
-            db[table_name].insert_all(batch, alter=True)
+            with conn:
+                db[table_name].insert_all(batch, alter=True)
 
         return inner
 
@@ -165,21 +167,23 @@ async def upload_csvs(scope, receive, datasette, request):
             def mark_complete(conn):
                 nonlocal i
                 database = sqlite_utils.Database(conn)
-                database["_csv_progress_"].update(
-                    task_id,
-                    {
-                        "rows_done": i,
-                        "bytes_done": total_size,
-                        "completed": str(datetime.datetime.utcnow()),
-                    },
-                )
+                with conn:
+                    database["_csv_progress_"].update(
+                        task_id,
+                        {
+                            "rows_done": i,
+                            "bytes_done": total_size,
+                            "completed": str(datetime.datetime.utcnow()),
+                        },
+                    )
 
             await db.execute_write_fn(mark_complete)
 
             # Transform columns to detected types
             def transform_columns(conn):
                 database = sqlite_utils.Database(conn)
-                database[table_name].transform(types=tracker.types)
+                with conn:
+                    database[table_name].transform(types=tracker.types)
 
             await db.execute_write_fn(transform_columns)
 

@@ -164,7 +164,7 @@ async def test_upload(
             assert "<h1>Upload in progress</h1>" in response.text
             assert expected_url in response.text
 
-        # Now things get tricky... the upload is running in a thread, so poll for completion
+        # Now things get tricky... the upload is running in a task, so poll for completion
         fail_after = 20
         iterations = 0
         while True:
