@@ -183,6 +183,7 @@ async def upload_csvs(scope, receive, datasette, request):
             def transform_columns(conn):
                 database = sqlite_utils.Database(conn)
                 with conn:
+                    print("Transforming types to", tracker.types)
                     database[table_name].transform(types=tracker.types)
 
             await db.execute_write_fn(transform_columns)
