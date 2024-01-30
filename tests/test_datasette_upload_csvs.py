@@ -16,7 +16,7 @@ async def test_lifespan():
     async with LifespanManager(app):
         async with httpx.AsyncClient(app=app) as client:
             response = await client.get("http://localhost/")
-            assert 200 == response.status_code
+            assert response.status_code == 200
 
 
 @pytest.mark.asyncio
@@ -47,10 +47,8 @@ async def test_menu(tmpdir, auth, has_database):
             should_allow = False
             if auth and has_database:
                 assert "/-/upload-csvs" in response.text
-                should_allow = True
             else:
                 assert "/-/upload-csvs" not in response.text
-                should_allow == False
             assert (
                 (
                     await client.get("http://localhost/-/upload-csvs", cookies=cookies)
@@ -138,7 +136,7 @@ async def test_upload(
     # First test the upload page exists
     async with httpx.AsyncClient(app=datasette.app()) as client:
         response = await client.get("http://localhost/-/upload-csvs", cookies=cookies)
-        assert 200 == response.status_code
+        assert response.status_code == 200
         assert (
             '<form action="/-/upload-csvs" id="uploadForm" method="post"'
             in response.text
@@ -191,16 +189,16 @@ async def test_upload(
 @pytest.mark.asyncio
 async def test_permissions(tmpdir):
     path = str(tmpdir / "data.db")
-    db = sqlite_utils.Database(path)["foo"].insert({"hello": "world"})
+    sqlite_utils.Database(path)["foo"].insert({"hello": "world"})
     ds = Datasette([path])
     app = ds.app()
     async with httpx.AsyncClient(app=app) as client:
         response = await client.get("http://localhost/-/upload-csvs")
-        assert 403 == response.status_code
+        assert response.status_code == 403
     # Now try with a root actor
     async with httpx.AsyncClient(app=app) as client2:
         response2 = await client2.get(
             "http://localhost/-/upload-csvs",
             cookies={"ds_actor": ds.sign({"a": {"id": "root"}}, "actor")},
         )
-        assert 403 != response2.status_code
+        assert response2.status_code != 403

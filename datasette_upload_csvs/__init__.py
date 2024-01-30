@@ -11,7 +11,6 @@ import io
 import os
 import sqlite_utils
 from sqlite_utils.utils import TypeTracker
-import threading
 import uuid
 
 
