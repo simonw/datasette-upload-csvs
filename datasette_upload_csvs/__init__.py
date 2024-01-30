@@ -63,7 +63,8 @@ async def upload_csvs(scope, receive, datasette, request):
     ]
     if not dbs:
         raise Forbidden("No mutable databases available")
-    db = dbs[0]
+
+    default_db = dbs[0]
 
     # We need the ds_request to pass to render_template for CSRF tokens
     ds_request = request
@@ -71,13 +72,22 @@ async def upload_csvs(scope, receive, datasette, request):
     # We use the Starlette request object to handle file uploads
     starlette_request = Request(scope, receive)
     if starlette_request.method != "POST":
+        selected_db = ds_request.args.get("database")
+        databases = []
+        # If there are multiple databases let them choose
+        if len(dbs) > 1:
+            databases = [
+                {"name": db.name, "selected": db.name == selected_db} for db in dbs
+            ]
         return Response.html(
             await datasette.render_template(
-                "upload_csv.html", {"database_name": db.name}, request=ds_request
+                "upload_csv.html", {"databases": databases}, request=ds_request
             )
         )
 
     formdata = await starlette_request.form()
+    database_name = formdata.get("database") or default_db.name
+    db = datasette.get_database(database_name)
     csv = formdata["csv"]
     # csv.file is a SpooledTemporaryFile. csv.filename is the filename
     table_name = formdata.get("table")

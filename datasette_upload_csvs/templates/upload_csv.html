@@ -47,8 +47,19 @@ progress::-webkit-progress-value {
 
 {% block content %}
 <h1>Upload a CSV</h1>
-<p>A table will be created in database "<strong><a href="{{ urls.database(database_name) }}">{{ database_name }}</a></strong>".</p>
+
 <form action="/-/upload-csvs" id="uploadForm" method="post" enctype="multipart/form-data">
+
+{% if databases %}
+<p><label>Database &nbsp; &nbsp;
+  <select id="id_database" name="database">
+    {% for database in databases %}
+      <option{% if database.selected %} selected{% endif %}>{{ database.name }}</option>
+    {% endfor %}
+  </select></label>
+</p>
+{% endif %}
+
 <div id="file-drop">
     <input type="hidden" name="csrftoken" value="{{ csrftoken() }}">
     <input type="file" name="csv" id="csvUpload">
@@ -57,7 +68,7 @@ progress::-webkit-progress-value {
 <p style="margin-bottom: -0.8em;font-size: 0.8em; display: none;" id="progress-label">Uploading...</p>
 <progress class="progress" value="0" max="100">Uploading...</progress>
 <p style="margin-top: 1em">
-    <label for="id_table_name">Table name</label>
+    <label for="id_table_name">Table name</label>&nbsp; &nbsp;
     <input required id="id_table_name" type="text" name="table_name">
 </p>
 <p><input type="submit" value="Upload file" class="button"></p>
@@ -72,6 +83,7 @@ var progress = document.getElementsByTagName("progress")[0];
 var progressLabel = document.getElementById("progress-label");
 var label = dropArea.getElementsByTagName("label")[0];
 var tableName = document.getElementById("id_table_name");
+var databaseName = document.getElementById("id_database");
 
 // State that holds the most-recent uploaded File, from a FileList
 let currentFile = null;
@@ -199,6 +211,9 @@ uploadForm.addEventListener("submit", ev => {
   formData.append("csrftoken", "{{ csrftoken() }}");
   formData.append("csv", currentFile);
   formData.append("table", tableName.value);
+  if (databaseName) {
+    formData.append("database", databaseName.value);
+  }
   xhr.send(formData);
 });
 </script>

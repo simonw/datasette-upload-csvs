@@ -4,6 +4,7 @@ import asyncio
 from asgi_lifespan import LifespanManager
 import json
 from unittest.mock import ANY
+import pathlib
 import pytest
 import httpx
 import sqlite_utils
@@ -113,23 +114,28 @@ LATIN1_AFTER_FIRST_2KB = ("just_one_column\n" + "aabbcc\n" * 1048 + "a.b.é").en
     ),
 )
 @pytest.mark.parametrize("use_xhr", (True, False))
+@pytest.mark.parametrize("database", ("data", "data2"))
 async def test_upload(
-    tmpdir, filename, content, expected_table, expected_rows, use_xhr
+    tmpdir, filename, content, expected_table, expected_rows, use_xhr, database
 ):
-    expected_url = "/data/{}".format(tilde_encode(expected_table))
+    expected_url = "/{}/{}".format(database, tilde_encode(expected_table))
     path = str(tmpdir / "data.db")
-    db = sqlite_utils.Database(path)
-    db.vacuum()
-    db.enable_wal()
-    db["already_exists"].insert({"id": 1})
-    binary_content = content
-    # Trick to avoid a 12MB string being part of the pytest rendered test name:
-    if content == "LATIN1_AFTER_FIRST_2KB":
-        binary_content = LATIN1_AFTER_FIRST_2KB
+    path2 = str(tmpdir / "data2.db")
+    dbs_by_name = {}
+    for p in (path, path2):
+        db = sqlite_utils.Database(p)
+        dbs_by_name[pathlib.Path(p).stem] = db
+        db.vacuum()
+        db.enable_wal()
+        db["already_exists"].insert({"id": 1})
+        binary_content = content
+        # Trick to avoid a 12MB string being part of the pytest rendered test name:
+        if content == "LATIN1_AFTER_FIRST_2KB":
+            binary_content = LATIN1_AFTER_FIRST_2KB
 
-    db["hello"].insert({"hello": "world"})
+        db["hello"].insert({"hello": "world"})
 
-    datasette = Datasette([path])
+    datasette = Datasette([path, path2])
 
     cookies = {"ds_actor": datasette.sign({"a": {"id": "root"}}, "actor")}
 
@@ -141,6 +147,7 @@ async def test_upload(
             '<form action="/-/upload-csvs" id="uploadForm" method="post"'
             in response.text
         )
+        assert '<select id="id_database"' in response.text
         csrftoken = response.cookies["ds_csrftoken"]
         cookies["ds_csrftoken"] = csrftoken
 
@@ -153,7 +160,11 @@ async def test_upload(
                 else ""
             ),
             cookies=cookies,
-            data={"csrftoken": csrftoken, "xhr": "1" if use_xhr else ""},
+            data={
+                "csrftoken": csrftoken,
+                "xhr": "1" if use_xhr else "",
+                "database": database,
+            },
             files=files,
         )
         if use_xhr:
@@ -167,7 +178,7 @@ async def test_upload(
         iterations = 0
         while True:
             response = await client.get(
-                "http://localhost/data/_csv_progress_.json?_shape=array"
+                f"http://localhost/{database}/_csv_progress_.json?_shape=array"
             )
             rows = json.loads(response.content)
             assert 1 == len(rows)
@@ -178,10 +189,11 @@ async def test_upload(
                 break
             iterations += 1
             assert iterations < fail_after, "Took too long: {}".format(row)
-            await asyncio.sleep(0.5)
+            await asyncio.sleep(0.2)
 
     # Give time for last operation to complete:
-    await asyncio.sleep(0.5)
+    db = dbs_by_name[database]
+    await asyncio.sleep(0.2)
     rows = list(db[expected_table].rows)
     assert rows == expected_rows
 
