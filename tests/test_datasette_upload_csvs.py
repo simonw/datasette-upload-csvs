@@ -182,6 +182,8 @@ async def test_upload(
             assert iterations < fail_after, "Took too long: {}".format(row)
             await asyncio.sleep(0.5)
 
+    # Give time for last operation to complete:
+    await asyncio.sleep(0.5)
     rows = list(db[expected_table].rows)
     assert rows == expected_rows
 
