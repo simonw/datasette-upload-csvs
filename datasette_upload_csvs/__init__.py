@@ -1,3 +1,4 @@
+import asyncio
 from datasette import hookimpl
 from datasette.utils.asgi import Response, Forbidden
 from charset_normalizer import detect
@@ -107,73 +108,93 @@ async def upload_csvs(scope, receive, datasette, request):
 
     def insert_initial_record(conn):
         database = sqlite_utils.Database(conn)
-        database["_csv_progress_"].insert(
-            {
-                "id": task_id,
-                "table_name": table_name,
-                "bytes_todo": total_size,
-                "bytes_done": 0,
-                "rows_done": 0,
-                "started": str(datetime.datetime.utcnow()),
-                "completed": None,
-                "error": None,
-            },
-            pk="id",
-            alter=True,
-        )
+        with conn:
+            database["_csv_progress_"].insert(
+                {
+                    "id": task_id,
+                    "table_name": table_name,
+                    "bytes_todo": total_size,
+                    "bytes_done": 0,
+                    "rows_done": 0,
+                    "started": str(datetime.datetime.utcnow()),
+                    "completed": None,
+                    "error": None,
+                },
+                pk="id",
+                alter=True,
+            )
 
     await db.execute_write_fn(insert_initial_record)
 
-    def insert_docs(database):
-        reader = csv_std.reader(codecs.iterdecode(csv.file, encoding))
-        headers = next(reader)
+    def make_insert_batch(batch):
+        def inner(conn):
+            db = sqlite_utils.Database(conn)
+            with conn:
+                db[table_name].insert_all(batch, alter=True)
 
-        tracker = TypeTracker()
+        return inner
 
-        docs = tracker.wrap(dict(zip(headers, row)) for row in reader)
-
+    # We run a parser in a separate async task, writing and yielding every 100 rows
+    async def parse_csv():
         i = 0
+        tracker = TypeTracker()
+        try:
+            reader = csv_std.reader(codecs.iterdecode(csv.file, encoding))
+            headers = next(reader)
 
-        def docs_with_progress():
-            nonlocal i
+            docs = tracker.wrap(dict(zip(headers, row)) for row in reader)
+
+            batch = []
             for doc in docs:
+                batch.append(doc)
                 i += 1
-                yield doc
                 if i % 10 == 0:
+                    await db.execute_write(
+                        "update _csv_progress_ set rows_done = ?, bytes_done = ? where id = ?",
+                        (i, csv.file.tell(), task_id),
+                    )
+                if i % 100 == 0:
+                    await db.execute_write_fn(make_insert_batch(batch))
+                    batch = []
+                    # And yield to the event loop
+                    await asyncio.sleep(0)
+
+            if batch:
+                await db.execute_write_fn(make_insert_batch(batch))
+
+            # Mark progress as complete
+            def mark_complete(conn):
+                nonlocal i
+                database = sqlite_utils.Database(conn)
+                with conn:
                     database["_csv_progress_"].update(
                         task_id,
                         {
                             "rows_done": i,
-                            "bytes_done": csv.file.tell(),
+                            "bytes_done": total_size,
+                            "completed": str(datetime.datetime.utcnow()),
                         },
                     )
 
-        database[table_name].insert_all(
-            docs_with_progress(), alter=True, batch_size=100
-        )
-        database["_csv_progress_"].update(
-            task_id,
-            {
-                "rows_done": i,
-                "bytes_done": total_size,
-                "completed": str(datetime.datetime.utcnow()),
-            },
-        )
-        # Trasform columns to detected types
-        database[table_name].transform(types=tracker.types)
-        return database[table_name].count
+            await db.execute_write_fn(mark_complete)
 
-    def insert_docs_catch_errors(conn):
-        database = sqlite_utils.Database(conn)
-        try:
-            insert_docs(database)
+            # Transform columns to detected types
+            def transform_columns(conn):
+                database = sqlite_utils.Database(conn)
+                with conn:
+                    print("Transforming types to", tracker.types)
+                    database[table_name].transform(types=tracker.types)
+
+            await db.execute_write_fn(transform_columns)
+
         except Exception as error:
-            database["_csv_progress_"].update(
-                task_id,
-                {"error": str(error)},
+            await db.execute_write(
+                "update _csv_progress_ set error = ? where id = ?",
+                (str(error), task_id),
             )
 
-    await db.execute_write_fn(insert_docs_catch_errors, block=False)
+    # Run that as a task
+    asyncio.create_task(parse_csv())
 
     if formdata.get("xhr"):
         return Response.json(

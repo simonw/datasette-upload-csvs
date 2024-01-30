@@ -16,7 +16,7 @@ async def test_lifespan():
     async with LifespanManager(app):
         async with httpx.AsyncClient(app=app) as client:
             response = await client.get("http://localhost/")
-            assert 200 == response.status_code
+            assert response.status_code == 200
 
 
 @pytest.mark.asyncio
@@ -47,10 +47,8 @@ async def test_menu(tmpdir, auth, has_database):
             should_allow = False
             if auth and has_database:
                 assert "/-/upload-csvs" in response.text
-                should_allow = True
             else:
                 assert "/-/upload-csvs" not in response.text
-                should_allow == False
             assert (
                 (
                     await client.get("http://localhost/-/upload-csvs", cookies=cookies)
@@ -138,7 +136,7 @@ async def test_upload(
     # First test the upload page exists
     async with httpx.AsyncClient(app=datasette.app()) as client:
         response = await client.get("http://localhost/-/upload-csvs", cookies=cookies)
-        assert 200 == response.status_code
+        assert response.status_code == 200
         assert (
             '<form action="/-/upload-csvs" id="uploadForm" method="post"'
             in response.text
@@ -164,7 +162,7 @@ async def test_upload(
             assert "<h1>Upload in progress</h1>" in response.text
             assert expected_url in response.text
 
-        # Now things get tricky... the upload is running in a thread, so poll for completion
+        # Now things get tricky... the upload is running in a task, so poll for completion
         fail_after = 20
         iterations = 0
         while True:
@@ -182,6 +180,8 @@ async def test_upload(
             assert iterations < fail_after, "Took too long: {}".format(row)
             await asyncio.sleep(0.5)
 
+    # Give time for last operation to complete:
+    await asyncio.sleep(0.5)
     rows = list(db[expected_table].rows)
     assert rows == expected_rows
 
@@ -189,16 +189,16 @@ async def test_upload(
 @pytest.mark.asyncio
 async def test_permissions(tmpdir):
     path = str(tmpdir / "data.db")
-    db = sqlite_utils.Database(path)["foo"].insert({"hello": "world"})
+    sqlite_utils.Database(path)["foo"].insert({"hello": "world"})
     ds = Datasette([path])
     app = ds.app()
     async with httpx.AsyncClient(app=app) as client:
         response = await client.get("http://localhost/-/upload-csvs")
-        assert 403 == response.status_code
+        assert response.status_code == 403
     # Now try with a root actor
     async with httpx.AsyncClient(app=app) as client2:
         response2 = await client2.get(
             "http://localhost/-/upload-csvs",
             cookies={"ds_actor": ds.sign({"a": {"id": "root"}}, "actor")},
         )
-        assert 403 != response2.status_code
+        assert response2.status_code != 403
