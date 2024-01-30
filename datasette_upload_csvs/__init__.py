@@ -44,6 +44,27 @@ def menu_links(datasette, actor):
     return inner
 
 
+@hookimpl
+def database_actions(datasette, actor, database):
+    async def inner():
+        db = datasette.get_database(database)
+        if (
+            await datasette.permission_allowed(actor, "upload-csvs", default=False)
+            and db.is_mutable
+            and db.name not in ("_memory", "_internal")
+        ):
+            return [
+                {
+                    "href": datasette.urls.path(
+                        "/-/upload-csvs?database={}".format(quote_plus(db.name))
+                    ),
+                    "label": "Upload a CSV",
+                }
+            ]
+
+    return inner
+
+
 async def upload_csvs(scope, receive, datasette, request):
     if not await datasette.permission_allowed(
         request.actor, "upload-csvs", default=False
