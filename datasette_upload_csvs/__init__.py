@@ -102,7 +102,9 @@ async def upload_csvs(scope, receive, datasette, request):
             ]
         return Response.html(
             await datasette.render_template(
-                "upload_csv.html", {"databases": databases}, request=ds_request
+                "upload_csv.html",
+                {"databases": databases, "selected_name": selected_db},
+                request=ds_request,
             )
         )
 

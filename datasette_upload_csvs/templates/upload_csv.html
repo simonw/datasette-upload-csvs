@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Upload a CSV to "{{ database_name }}"{% endblock %}
+{% block title %}Upload CSV{% if selected_name %} to "{{ selected_name }}"{% endif %}{% endblock %}
 
 {% block extra_head %}
 {{ super() }}
@@ -46,7 +46,7 @@ progress::-webkit-progress-value {
 {% endblock %}
 
 {% block content %}
-<h1>Upload a CSV</h1>
+<h1>Upload CSV</h1>
 
 <form action="/-/upload-csvs" id="uploadForm" method="post" enctype="multipart/form-data">
 
