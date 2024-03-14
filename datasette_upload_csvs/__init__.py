@@ -58,7 +58,8 @@ def database_actions(datasette, actor, database):
                     "href": datasette.urls.path(
                         "/-/upload-csvs?database={}".format(quote_plus(db.name))
                     ),
-                    "label": "Upload a CSV",
+                    "label": "Upload CSV",
+                    "description": "Create a new table by uploading a CSV file",
                 }
             ]
 
