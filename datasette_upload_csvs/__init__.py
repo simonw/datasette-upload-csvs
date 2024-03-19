@@ -120,12 +120,13 @@ async def upload_csvs(scope, receive, datasette, request):
         if table_name.endswith(".csv"):
             table_name = table_name[:-4]
 
-    # If the table already exists, add a suffix
-    suffix = 2
-    base_table_name = table_name
-    while await db.table_exists(table_name):
-        table_name = "{}_{}".format(base_table_name, suffix)
-        suffix += 1
+    if not formdata.get('append') == 'true':
+        # If the table already exists, add a suffix
+        suffix = 2
+        base_table_name = table_name
+        while await db.table_exists(table_name):
+            table_name = "{}_{}".format(base_table_name, suffix)
+            suffix += 1
 
     total_size = get_temporary_file_size(csv.file)
     task_id = str(uuid.uuid4())

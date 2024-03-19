@@ -71,6 +71,10 @@ progress::-webkit-progress-value {
     <label for="id_table_name">Table name</label>&nbsp; &nbsp;
     <input required id="id_table_name" type="text" name="table_name">
 </p>
+<p style="margin-top: 1em">
+    <label for="id_table_append">Append rows <br/> (if the table exists)</label>&nbsp; &nbsp;
+    <input id="id_table_append" type="checkbox" name="table_append">
+</p>
 <p><input type="submit" value="Upload file" class="button"></p>
 </form>
 </div>
@@ -83,6 +87,7 @@ var progress = document.getElementsByTagName("progress")[0];
 var progressLabel = document.getElementById("progress-label");
 var label = dropArea.getElementsByTagName("label")[0];
 var tableName = document.getElementById("id_table_name");
+var tableAppend = document.getElementById("id_table_append");
 var databaseName = document.getElementById("id_database");
 
 // State that holds the most-recent uploaded File, from a FileList
@@ -211,6 +216,9 @@ uploadForm.addEventListener("submit", ev => {
   formData.append("csrftoken", "{{ csrftoken() }}");
   formData.append("csv", currentFile);
   formData.append("table", tableName.value);
+  if (tableAppend.checked) {
+    formData.append("append", tableAppend.checked);
+  }
   if (databaseName) {
     formData.append("database", databaseName.value);
   }

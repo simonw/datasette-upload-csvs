@@ -13,7 +13,7 @@ Datasette plugin for uploading CSV files and converting them to database tables
 
 ## Usage
 
-The plugin adds an interface at `/-/upload-csvs` for uploading a CSV file and using it to create a new database table.
+The plugin adds an interface at `/-/upload-csvs` for uploading a CSV file and using it to create a new database table. An interface provide an option to append rows to an existent table in the database.
 
 By default only [the root actor](https://datasette.readthedocs.io/en/stable/authentication.html#using-the-root-actor) can access the page - so you'll need to run Datasette with the `--root` option and click on the link shown in the terminal to sign in and access the page.
 
