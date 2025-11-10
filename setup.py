@@ -28,7 +28,7 @@ setup(
     version=VERSION,
     packages=["datasette_upload_csvs"],
     entry_points={"datasette": ["upload_csvs = datasette_upload_csvs"]},
-    python_requires=">=3.7",
+    python_requires=">=3.10",
     install_requires=[
         "datasette>=0.61",
         "asgi-csrf>=0.7",
