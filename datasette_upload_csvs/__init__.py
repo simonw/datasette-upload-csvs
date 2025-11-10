@@ -1,5 +1,6 @@
 import asyncio
 from datasette import hookimpl
+from datasette.permissions import Action
 from datasette.utils.asgi import Response, Forbidden
 from charset_normalizer import detect
 from starlette.requests import Request
@@ -15,9 +16,13 @@ import uuid
 
 
 @hookimpl
-def permission_allowed(actor, action):
-    if action == "upload-csvs" and actor and actor.get("id") == "root":
-        return True
+def register_actions(datasette):
+    return [
+        Action(
+            name="upload-csvs",
+            description="Create tables by uploading CSV files",
+        )
+    ]
 
 
 @hookimpl
@@ -31,9 +36,7 @@ def register_routes():
 @hookimpl
 def menu_links(datasette, actor):
     async def inner():
-        if await datasette.permission_allowed(
-            actor, "upload-csvs", default=False
-        ) and any(
+        if await datasette.allowed(actor=actor, action="upload-csvs") and any(
             db.is_mutable and db.name not in ("_memory", "_internal")
             for db in datasette.databases.values()
         ):
@@ -49,7 +52,7 @@ def database_actions(datasette, actor, database):
     async def inner():
         db = datasette.get_database(database)
         if (
-            await datasette.permission_allowed(actor, "upload-csvs", default=False)
+            await datasette.allowed(actor=actor, action="upload-csvs")
             and db.is_mutable
             and db.name not in ("_memory", "_internal")
         ):
@@ -67,9 +70,7 @@ def database_actions(datasette, actor, database):
 
 
 async def upload_csvs(scope, receive, datasette, request):
-    if not await datasette.permission_allowed(
-        request.actor, "upload-csvs", default=False
-    ):
+    if not await datasette.allowed(actor=request.actor, action="upload-csvs"):
         raise Forbidden("Permission denied for upload-csvs")
 
     num_bytes_to_detect_with = 2048 * 1024

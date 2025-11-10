@@ -1,32 +1,26 @@
 from datasette.app import Datasette
 from datasette.utils import tilde_encode
 import asyncio
-from asgi_lifespan import LifespanManager
 import json
 from unittest.mock import ANY
 import pathlib
 import pytest
-import httpx
 import sqlite_utils
 
 
 @pytest.mark.asyncio
 async def test_lifespan():
     ds = Datasette([], memory=True)
-    app = ds.app()
-    async with LifespanManager(app):
-        async with httpx.AsyncClient(app=app) as client:
-            response = await client.get("http://localhost/")
-            assert response.status_code == 200
+    response = await ds.client.get("/")
+    assert response.status_code == 200
 
 
 @pytest.mark.asyncio
 async def test_redirect():
     datasette = Datasette([], memory=True)
-    async with httpx.AsyncClient(app=datasette.app()) as client:
-        response = await client.get("http://localhost/-/upload-csv")
-        assert response.status_code == 302
-        assert response.headers["location"] == "/-/upload-csvs"
+    response = await datasette.client.get("/-/upload-csv")
+    assert response.status_code == 302
+    assert response.headers["location"] == "/-/upload-csvs"
 
 
 @pytest.mark.asyncio
@@ -37,27 +31,22 @@ async def test_menu(tmpdir, auth, has_database):
     db = sqlite_utils.Database(path)
     db.vacuum()
     ds = Datasette([path] if has_database else [], memory=True)
-    app = ds.app()
-    async with LifespanManager(app):
-        async with httpx.AsyncClient(app=app) as client:
-            cookies = {}
-            if auth:
-                cookies = {"ds_actor": ds.sign({"a": {"id": "root"}}, "actor")}
-            response = await client.get("http://localhost/", cookies=cookies)
-            assert response.status_code == 200
-            should_allow = False
-            if auth and has_database:
-                assert "/-/upload-csvs" in response.text
-            else:
-                assert "/-/upload-csvs" not in response.text
-            assert (
-                (
-                    await client.get("http://localhost/-/upload-csvs", cookies=cookies)
-                ).status_code
-                == 200
-                if should_allow
-                else 403
-            )
+    cookies = {}
+    if auth:
+        ds.root_enabled = True
+        cookies = {"ds_actor": ds.sign({"a": {"id": "root"}}, "actor")}
+    response = await ds.client.get("/", cookies=cookies)
+    assert response.status_code == 200
+    should_allow = False
+    if auth and has_database:
+        assert "/-/upload-csvs" in response.text
+    else:
+        assert "/-/upload-csvs" not in response.text
+    assert (
+        (await ds.client.get("/-/upload-csvs", cookies=cookies)).status_code == 200
+        if should_allow
+        else 403
+    )
 
 
 SIMPLE = b"name,age\nCleo,5\nPancakes,4"
@@ -136,60 +125,59 @@ async def test_upload(
         db["hello"].insert({"hello": "world"})
 
     datasette = Datasette([path, path2])
+    datasette.root_enabled = True
 
     cookies = {"ds_actor": datasette.sign({"a": {"id": "root"}}, "actor")}
 
     # First test the upload page exists
-    async with httpx.AsyncClient(app=datasette.app()) as client:
-        response = await client.get("http://localhost/-/upload-csvs", cookies=cookies)
-        assert response.status_code == 200
-        assert (
-            '<form action="/-/upload-csvs" id="uploadForm" method="post"'
-            in response.text
-        )
-        assert '<select id="id_database"' in response.text
-        csrftoken = response.cookies["ds_csrftoken"]
-        cookies["ds_csrftoken"] = csrftoken
+    response = await datasette.client.get("/-/upload-csvs", cookies=cookies)
+    assert response.status_code == 200
+    assert (
+        '<form action="/-/upload-csvs" id="uploadForm" method="post"' in response.text
+    )
+    assert '<select id="id_database"' in response.text
+    csrftoken = response.cookies["ds_csrftoken"]
+    cookies["ds_csrftoken"] = csrftoken
 
-        # Now try uploading a file
-        files = {"csv": (filename, binary_content, "text/csv")}
-        response = await client.post(
-            "http://localhost/-/upload-csvs{}".format(
-                "?_num_bytes_to_detect_with=2048"
-                if content == "LATIN1_AFTER_FIRST_2KB"
-                else ""
-            ),
-            cookies=cookies,
-            data={
-                "csrftoken": csrftoken,
-                "xhr": "1" if use_xhr else "",
-                "database": database,
-            },
-            files=files,
-        )
-        if use_xhr:
-            assert response.json()["url"] == expected_url
-        else:
-            assert "<h1>Upload in progress</h1>" in response.text
-            assert expected_url in response.text
+    # Now try uploading a file
+    files = {"csv": (filename, binary_content, "text/csv")}
+    response = await datasette.client.post(
+        "/-/upload-csvs{}".format(
+            "?_num_bytes_to_detect_with=2048"
+            if content == "LATIN1_AFTER_FIRST_2KB"
+            else ""
+        ),
+        cookies=cookies,
+        data={
+            "csrftoken": csrftoken,
+            "xhr": "1" if use_xhr else "",
+            "database": database,
+        },
+        files=files,
+    )
+    if use_xhr:
+        assert response.json()["url"] == expected_url
+    else:
+        assert "<h1>Upload in progress</h1>" in response.text
+        assert expected_url in response.text
 
-        # Now things get tricky... the upload is running in a task, so poll for completion
-        fail_after = 20
-        iterations = 0
-        while True:
-            response = await client.get(
-                f"http://localhost/{database}/_csv_progress_.json?_shape=array"
-            )
-            rows = json.loads(response.content)
-            assert 1 == len(rows)
-            row = rows[0]
-            assert row["table_name"] == expected_table
-            assert not row["error"], row
-            if row["bytes_todo"] == row["bytes_done"]:
-                break
-            iterations += 1
-            assert iterations < fail_after, "Took too long: {}".format(row)
-            await asyncio.sleep(0.2)
+    # Now things get tricky... the upload is running in a task, so poll for completion
+    fail_after = 20
+    iterations = 0
+    while True:
+        response = await datasette.client.get(
+            f"/{database}/_csv_progress_.json?_shape=array"
+        )
+        rows = json.loads(response.content)
+        assert 1 == len(rows)
+        row = rows[0]
+        assert row["table_name"] == expected_table
+        assert not row["error"], row
+        if row["bytes_todo"] == row["bytes_done"]:
+            break
+        iterations += 1
+        assert iterations < fail_after, "Took too long: {}".format(row)
+        await asyncio.sleep(0.2)
 
     # Give time for last operation to complete:
     db = dbs_by_name[database]
@@ -203,14 +191,12 @@ async def test_permissions(tmpdir):
     path = str(tmpdir / "data.db")
     sqlite_utils.Database(path)["foo"].insert({"hello": "world"})
     ds = Datasette([path])
-    app = ds.app()
-    async with httpx.AsyncClient(app=app) as client:
-        response = await client.get("http://localhost/-/upload-csvs")
-        assert response.status_code == 403
+    response = await ds.client.get("/-/upload-csvs")
+    assert response.status_code == 403
     # Now try with a root actor
-    async with httpx.AsyncClient(app=app) as client2:
-        response2 = await client2.get(
-            "http://localhost/-/upload-csvs",
-            cookies={"ds_actor": ds.sign({"a": {"id": "root"}}, "actor")},
-        )
-        assert response2.status_code != 403
+    ds.root_enabled = True
+    response2 = await ds.client.get(
+        "/-/upload-csvs",
+        cookies={"ds_actor": ds.sign({"a": {"id": "root"}}, "actor")},
+    )
+    assert response2.status_code != 403
